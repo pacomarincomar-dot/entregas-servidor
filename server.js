@@ -21,7 +21,7 @@ app.post('/api/claude', async (req, res) => {
     if (!apiKey) return res.status(401).json({ error: 'API key required' });
 
     const body = {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 2000,
       system,
       messages: [{ role: 'user', content: user }]
