@@ -12,6 +12,29 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'Entregas API' });
 });
 
+// Telegram notification endpoint
+app.post('/api/telegram', async (req, res) => {
+  try {
+    const { mensaje, chatId, token } = req.body;
+    const tToken = token || process.env.TELEGRAM_TOKEN;
+    const tChat = chatId || process.env.TELEGRAM_CHAT_ID;
+    if (!tToken || !tChat) return res.status(400).json({ error: 'Token o chatId no configurado' });
+    const response = await fetch(`https://api.telegram.org/bot${tToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: tChat,
+        text: mensaje,
+        parse_mode: 'HTML'
+      })
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/claude', async (req, res) => {
   try {
     const { system, user, mcp, image } = req.body;
