@@ -1,15 +1,36 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
- 
+const mysql = require('mysql2/promise');
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
- 
+
 const PORT = process.env.PORT || 3000;
- 
+
+const dbPool = mysql.createPool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT || 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || undefined,
+  waitForConnections: true,
+  connectionLimit: 10
+});
+
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'Entregas API' });
+});
+
+app.get('/api/db-test', async (req, res) => {
+  try {
+    const [rows] = await dbPool.query('SELECT 1 AS ok');
+    res.json({ connected: true, result: rows });
+  } catch (err) {
+    res.status(500).json({ connected: false, error: err.message });
+  }
 });
  
 // Telegram notification endpoint
