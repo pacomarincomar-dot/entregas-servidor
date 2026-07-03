@@ -55,6 +55,16 @@ app.get('/api/db-explore/all-tables', async (req, res) => {
   }
 });
 
+app.get('/api/db-explore/grants', async (req, res) => {
+  try {
+    const [grants] = await dbPool.query('SHOW GRANTS FOR CURRENT_USER()');
+    const [user] = await dbPool.query('SELECT CURRENT_USER() AS u');
+    res.json({ user: user[0].u, grants: grants.map(r => Object.values(r)[0]) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/db-explore/tables/:db', async (req, res) => {
   try {
     const db = req.params.db.replace(/[^a-zA-Z0-9_]/g, '');
