@@ -32,6 +32,44 @@ app.get('/api/db-test', async (req, res) => {
     res.status(500).json({ connected: false, error: err.message });
   }
 });
+
+// --- Endpoints de exploración (usar solo en local, quitar en producción) ---
+
+app.get('/api/db-explore/databases', async (req, res) => {
+  try {
+    const [rows] = await dbPool.query('SHOW DATABASES');
+    res.json(rows.map(r => Object.values(r)[0]));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/db-explore/tables/:db', async (req, res) => {
+  try {
+    const db = req.params.db.replace(/[^a-zA-Z0-9_]/g, '');
+    const [rows] = await dbPool.query(`SHOW TABLES FROM \`${db}\``);
+    res.json(rows.map(r => Object.values(r)[0]));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/db-explore/columns/:db/:table', async (req, res) => {
+  try {
+    const db = req.params.db.replace(/[^a-zA-Z0-9_]/g, '');
+    const table = req.params.table.replace(/[^a-zA-Z0-9_]/g, '');
+    const [rows] = await dbPool.query(
+      'SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA ' +
+      'FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION',
+      [db, table]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Fin endpoints exploración ---
  
 // Telegram notification endpoint
 app.post('/api/telegram', async (req, res) => {
