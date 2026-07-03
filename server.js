@@ -44,6 +44,17 @@ app.get('/api/db-explore/databases', async (req, res) => {
   }
 });
 
+app.get('/api/db-explore/all-tables', async (req, res) => {
+  try {
+    const [rows] = await dbPool.query(
+      'SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA NOT IN (\'information_schema\',\'mysql\',\'performance_schema\',\'sys\') ORDER BY TABLE_SCHEMA, TABLE_NAME'
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/db-explore/tables/:db', async (req, res) => {
   try {
     const db = req.params.db.replace(/[^a-zA-Z0-9_]/g, '');
