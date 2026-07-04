@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply font-sans text-slate-700 antialiased;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-colors duration-200;
+  }
+  .btn-accent {
+    @apply btn bg-accent text-brand-dark hover:bg-accent-dark;
+  }
+  .btn-outline {
+    @apply btn border-2 border-white/70 text-white hover:bg-white hover:text-brand;
+  }
+  .btn-ghost {
+    @apply btn border-2 border-brand/20 text-brand hover:border-brand hover:bg-brand hover:text-white;
+  }
+
+  .eyebrow {
+    @apply text-accent-dark font-semibold uppercase tracking-widest text-xs;
+  }
+  .section-title {
+    @apply mt-2 text-3xl sm:text-4xl font-bold text-brand-dark tracking-tight;
+  }
+  .section-lead {
+    @apply mt-4 text-base sm:text-lg text-slate-600 max-w-2xl;
+  }
+
+  .nav-link {
+    @apply text-sm font-medium text-white/85 hover:text-white transition-colors;
+  }
+  .nav-link-active {
+    @apply text-sm font-semibold text-accent;
+  }
+
+  .card {
+    @apply rounded-2xl bg-white shadow-soft ring-1 ring-black/5 p-6 sm:p-8;
+  }
+
+  .stat {
+    @apply flex flex-col items-center sm:items-start;
+  }
+  .stat dt {
+    @apply text-3xl sm:text-4xl font-extrabold text-white;
+  }
+  .stat dd {
+    @apply mt-1 text-sm text-white/70;
+  }
+
+  .photo-slot {
+    @apply relative flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand/20 bg-brand/[0.03] p-8 text-center text-brand/50 min-h-[220px];
+  }
+  .photo-slot svg {
+    @apply h-10 w-10 text-brand/30;
+  }
+  .photo-slot span {
+    @apply text-xs font-medium uppercase tracking-wide text-brand/40;
+  }
+
+  .icon-tile {
+    @apply flex h-12 w-12 items-center justify-center rounded-xl bg-accent/15 text-accent-dark;
+  }
+
+  .breadcrumb-hero {
+    @apply relative overflow-hidden bg-brand;
+  }
+}

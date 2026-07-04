@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 80">
+  <g transform="translate(0,8)">
+    <rect width="64" height="64" rx="14" fill="#F2A93B"/>
+    <rect x="6" y="24" width="28" height="16" rx="2.5" fill="#0B2A4A"/>
+    <path d="M34 28h13.5c1.1 0 2.1.58 2.66 1.52l4.2 7.1c.3.52.48 1.12.48 1.73V38.5H34V28z" fill="#0B2A4A"/>
+    <path d="M40 30.5h6l3.1 5.2h-9.1z" fill="#F2A93B"/>
+    <circle cx="17" cy="42.5" r="5.4" fill="#0B2A4A"/>
+    <circle cx="17" cy="42.5" r="2.2" fill="#F2A93B"/>
+    <circle cx="43" cy="42.5" r="5.4" fill="#0B2A4A"/>
+    <circle cx="43" cy="42.5" r="2.2" fill="#F2A93B"/>
+    <rect x="4" y="41.5" width="56" height="2.4" rx="1.2" fill="#0B2A4A" opacity="0.18"/>
+  </g>
+  <text x="84" y="41" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="27" fill="#FFFFFF">Transportes Calderón</text>
+  <text x="84" y="63" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="13" letter-spacing="3" fill="#F2A93B">ÉCIJA · SEVILLA</text>
+</svg>
