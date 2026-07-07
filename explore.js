@@ -43,11 +43,11 @@ const mysql = require('mysql2/promise');
     );
     last.forEach(r => console.log(JSON.stringify(r)));
 
-    console.log('\n=== SERIES Y ULTIMO NUMERO (FACCLI) ===');
+    console.log('\n=== ULTIMO INUMFAC POR CANAL (FACCLI) ===');
     const [series] = await conn.query(
-      'SELECT SERIE, MAX(NUMERO) as ULTIMO FROM FACCLI GROUP BY SERIE ORDER BY SERIE'
+      'SELECT VCODCAN, MAX(CAST(INUMFAC AS UNSIGNED)) as ULTIMO FROM FACCLI GROUP BY VCODCAN ORDER BY VCODCAN'
     );
-    series.forEach(r => console.log(`SERIE=${r.SERIE} | ULTIMO=${r.ULTIMO}`));
+    series.forEach(r => console.log(`CANAL=${r.VCODCAN} | ULTIMO=${r.ULTIMO}`));
 
   } catch (err) {
     console.error('ERROR:', err.message);
