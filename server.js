@@ -161,7 +161,7 @@ app.post('/api/facturas-simplificadas', async (req, res) => {
           DDTOFAC, DIDTOFAC, DDPPFAC, DIPPFAC, DSUMDTOFAC,
           DTPORTES_COSTE, DTPORTES_VENTA, DBASE_DGEN, DBASE_DPP,
           DSUMA_PORTES_B1, DSUMA_PORTES_B2, DSUMA_PORTES_B3,
-          DPIRPF, DIIRPF, DBASE_IRPF, DCANON_TOTAL, DBASE_TOTAL)
+          DPIRPF, DIIRPF, DBASE_IRPF, DBASE_TOTAL)
        VALUES
          (1, NULL, 'N', 'A', 'A', ?, 'TK', ?,
           ?, ?, ?,
@@ -175,7 +175,7 @@ app.post('/api/facturas-simplificadas', async (req, res) => {
           0, 0, 0, 0, 0,
           0, 0, 0, 0,
           0, 0, 0,
-          0, 0, 0, 0, ?)`,
+          0, 0, 0, ?)`,
       [
         inumfac, fechaDoc,
         cliente?.codigo || null, cliente?.nombre || null, cliente?.nif || null,
