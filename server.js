@@ -15,10 +15,13 @@ const dbPool = mysql.createPool({
   port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME || undefined,
+  database: process.env.DB_NAME || 'nura_comar',
   waitForConnections: true,
   connectionLimit: 10
 });
+
+function round4(n) { return Math.round(n * 10000) / 10000; }
+function round2(n) { return Math.round(n * 100) / 100; }
 
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'Entregas API' });
@@ -91,7 +94,152 @@ app.get('/api/db-explore/columns/:db/:table', async (req, res) => {
 });
 
 // --- Fin endpoints exploración ---
- 
+
+// POST /api/facturas-simplificadas
+// Body: { fecha, cliente: {codigo, nombre, nif}, lineas: [{codigo, descripcion, cantidad, precio, piva, descuento}], cobro: {idfpa, importe} }
+app.post('/api/facturas-simplificadas', async (req, res) => {
+  const { fecha, cliente, lineas, cobro } = req.body;
+  if (!lineas || !lineas.length) return res.status(400).json({ error: 'Se requieren lineas' });
+
+  const conn = await dbPool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Calcular totales por línea
+    const lines = lineas.map((l, i) => {
+      const precio  = parseFloat(l.precio)    || 0;
+      const piva    = parseFloat(l.piva)      || 0;
+      const cant    = parseFloat(l.cantidad)  || 1;
+      const dto     = parseFloat(l.descuento) || 0;
+      const precioIva   = round4(precio * (1 + piva / 100));
+      const ivaUnit     = round4(precio * piva / 100);
+      return {
+        orden: i + 1,
+        codigo:      l.codigo      || 'ENTREGA',
+        descripcion: l.descripcion || '',
+        cant, precio, piva, dto,
+        precioIva,
+        ivaUnit,
+        totalSinIva: round4(precio * cant),
+        totalConIva: round4(precioIva * cant),
+        totalIva:    round4(ivaUnit * cant),
+      };
+    });
+
+    // Agrupar bases por % IVA (máx 3 tramos)
+    const ivaMap = {};
+    lines.forEach(l => {
+      if (!ivaMap[l.piva]) ivaMap[l.piva] = { base: 0, cuota: 0, pct: l.piva };
+      ivaMap[l.piva].base  = round4(ivaMap[l.piva].base  + l.totalSinIva);
+      ivaMap[l.piva].cuota = round4(ivaMap[l.piva].cuota + l.totalIva);
+    });
+    const slots    = Object.values(ivaMap).slice(0, 3);
+    const totalFac = round2(lines.reduce((s, l) => s + l.totalConIva, 0));
+    const sumaBases = round4(lines.reduce((s, l) => s + l.totalSinIva, 0));
+
+    // Siguiente INUMFAC para canal TK
+    const [lastRow] = await conn.query(
+      "SELECT MAX(CAST(INUMFAC AS UNSIGNED)) AS u FROM FACCLISIM WHERE VCODCAN = 'TK'"
+    );
+    const inumfac  = String((lastRow[0].u || 0) + 1).padStart(9, '0');
+    const fechaDoc = fecha || new Date().toISOString().slice(0, 10);
+    const entrega  = cobro?.importe ? round2(parseFloat(cobro.importe)) : totalFac;
+    const cambio   = round2(Math.max(0, entrega - totalFac));
+
+    // Insertar cabecera FACCLISIM
+    const [ins] = await conn.query(
+      `INSERT INTO FACCLISIM
+         (ID_EMP, ID_EJE, VIMPRESO, VESTADOCAN, VESTADO, INUMFAC, VCODCAN, FFDOCFAC,
+          VCODCLI, VNCOMCLI, VNFISCLI,
+          DSUMA_IMPONIBLES, DTOTALFAC, DSUBTOTAL,
+          DIMP1FAC, DPIVA1FAC, DIIVA1FAC, DPRE1FAC,
+          DIMP2FAC, DPIVA2FAC, DIIVA2FAC, DPRE2FAC,
+          DIMP3FAC, DPIVA3FAC, DIIVA3FAC, DPRE3FAC,
+          DSUMA_LINB1, DSUMA_LINB2, DSUMA_LINB3,
+          DSUMA_ARTI_B1, DSUMA_ARTI_B2, DSUMA_ARTI_B3,
+          IDALM, ENTREGA, CAMBIO,
+          DDTOFAC, DIDTOFAC, DDPPFAC, DIPPFAC, DSUMDTOFAC,
+          DTPORTES_COSTE, DTPORTES_VENTA, DBASE_DGEN, DBASE_DPP,
+          DSUMA_PORTES_B1, DSUMA_PORTES_B2, DSUMA_PORTES_B3,
+          DPIRPF, DIIRPF, DBASE_IRPF, DCANON_TOTAL, DBASE_TOTAL)
+       VALUES
+         (1, NULL, 'N', 'A', 'A', ?, 'TK', ?,
+          ?, ?, ?,
+          ?, ?, ?,
+          ?, ?, ?, 0,
+          ?, ?, ?, 0,
+          ?, ?, ?, 0,
+          ?, ?, ?,
+          ?, ?, ?,
+          13, ?, ?,
+          0, 0, 0, 0, 0,
+          0, 0, 0, 0,
+          0, 0, 0,
+          0, 0, 0, 0, ?)`,
+      [
+        inumfac, fechaDoc,
+        cliente?.codigo || null, cliente?.nombre || null, cliente?.nif || null,
+        sumaBases, totalFac, totalFac,
+        slots[0]?.base || 0, slots[0]?.pct || 0, slots[0]?.cuota || 0,
+        slots[1]?.base || 0, slots[1]?.pct || 0, slots[1]?.cuota || 0,
+        slots[2]?.base || 0, slots[2]?.pct || 0, slots[2]?.cuota || 0,
+        slots[0]?.base || 0, slots[1]?.base || 0, slots[2]?.base || 0,
+        slots[0]?.base || 0, slots[1]?.base || 0, slots[2]?.base || 0,
+        entrega, cambio,
+        sumaBases
+      ]
+    );
+    const idfac = ins.insertId;
+
+    // Insertar líneas FACCLISIM_LIN
+    for (const l of lines) {
+      await conn.query(
+        `INSERT INTO FACCLISIM_LIN
+           (IDFAC, IORDFACD, VESTADOCAN, VCODARTI, VDESARTI,
+            DCANTIDAD, DPREFACD, DPIVAFACD, DPRUFACD, DPDTOFACD, DTOTFACD,
+            DPRUFACD_NETO, DTOTFACD_NETO, DPRUFACD_IVA, DTOTFACD_IVA,
+            IORDEN, IDALM, VTIPOLINEA,
+            DPRUFACD_LIQUIDO, DTOTFACD_LIQUIDO, DPDTO2FACD,
+            DPRUFACD_NETO_LINEA, DPCOSTE, DTCOSTE, DMARGEN, DMARGEN_GM,
+            DCOSTE_AGENTE, DTCOSTE_AGENTE, DCANTIDAD_CAN)
+         VALUES (?, ?, 'A', ?, ?,
+                 ?, ?, ?, ?, ?, ?,
+                 ?, ?, ?, ?,
+                 ?, 13, 'A',
+                 ?, ?, 0,
+                 ?, 0, 0, 0, 0,
+                 0, 0, ?)`,
+        [
+          idfac, l.orden, l.codigo, l.descripcion,
+          l.cant, l.precio, l.piva, l.precioIva, l.dto, l.totalConIva,
+          l.precio, l.totalSinIva, l.ivaUnit, l.totalIva,
+          l.orden,
+          l.precioIva, l.totalConIva,
+          l.precio,
+          l.cant
+        ]
+      );
+    }
+
+    // Insertar cobro FACCLISIM_COB
+    if (cobro) {
+      await conn.query(
+        'INSERT INTO FACCLISIM_COB (IDFPA, IMPORTE, FECHA_COBRO, IDFAC) VALUES (?, ?, NOW(), ?)',
+        [cobro.idfpa || 149, entrega, idfac]
+      );
+    }
+
+    await conn.commit();
+    res.json({ ok: true, idfac, inumfac, total: totalFac });
+
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
 // Telegram notification endpoint
 app.post('/api/telegram', async (req, res) => {
   try {
