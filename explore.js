@@ -9,45 +9,29 @@ const mysql = require('mysql2/promise');
       port: process.env.DB_PORT || 3306,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
+      database: 'nura_comar',
       connectTimeout: 10000
     });
 
-    console.log('\n=== TABLAS FAC / TIC / TICKET / FACTURA ===');
-    const [tables] = await conn.query(
-      `SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
-       FROM INFORMATION_SCHEMA.TABLES
-       WHERE TABLE_SCHEMA = 'nura_comar'
-         AND (TABLE_NAME LIKE '%FAC%' OR TABLE_NAME LIKE '%TIC%' OR TABLE_NAME LIKE '%TICKET%' OR TABLE_NAME LIKE '%FACTURA%')
-         AND TABLE_NAME NOT LIKE 'VW_%'
-       ORDER BY TABLE_NAME`
-    );
-    tables.forEach(r => console.log(`${r.TABLE_TYPE} - ${r.TABLE_NAME}`));
+    console.log('\n=== ID_EMP (empresa) ===');
+    const [emp] = await conn.query('SELECT DISTINCT ID_EMP FROM FACCLISIM LIMIT 5');
+    emp.forEach(r => console.log(r.ID_EMP));
 
-    console.log('\n=== VISTAS FAC / TIC / TICKET / FACTURA ===');
-    const [views] = await conn.query(
-      `SELECT TABLE_NAME
-       FROM INFORMATION_SCHEMA.TABLES
-       WHERE TABLE_SCHEMA = 'nura_comar'
-         AND (TABLE_NAME LIKE '%FAC%' OR TABLE_NAME LIKE '%TIC%' OR TABLE_NAME LIKE '%TICKET%' OR TABLE_NAME LIKE '%FACTURA%')
-         AND TABLE_NAME LIKE 'VW_%'
-       ORDER BY TABLE_NAME`
-    );
-    views.forEach(r => console.log(r.TABLE_NAME));
+    console.log('\n=== ID_EJE (ejercicios) ===');
+    const [eje] = await conn.query('SELECT DISTINCT ID_EJE FROM FACCLISIM ORDER BY ID_EJE DESC LIMIT 5');
+    eje.forEach(r => console.log(r.ID_EJE));
 
-    // Mostrar columnas de cada tabla base encontrada
-    if (tables.length > 0) {
-      for (const t of tables) {
-        console.log(`\n=== COLUMNAS: ${t.TABLE_NAME} ===`);
-        const [cols] = await conn.query(
-          `SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY, EXTRA
-           FROM INFORMATION_SCHEMA.COLUMNS
-           WHERE TABLE_SCHEMA = 'nura_comar' AND TABLE_NAME = ?
-           ORDER BY ORDINAL_POSITION`,
-          [t.TABLE_NAME]
-        );
-        cols.forEach(c => console.log(`  ${c.COLUMN_NAME} (${c.DATA_TYPE}) ${c.COLUMN_KEY} ${c.EXTRA}`));
-      }
-    }
+    console.log('\n=== CANALES (VCODCAN) ===');
+    const [can] = await conn.query('SELECT DISTINCT VCODCAN FROM FACCLISIM ORDER BY VCODCAN LIMIT 10');
+    can.forEach(r => console.log(r.VCODCAN));
+
+    console.log('\n=== ULTIMA FACTURA SIMPLIFICADA ===');
+    const [last] = await conn.query('SELECT IDFAC, INUMFAC, FFDOCFAC, VCODCAN, ID_EMP, ID_EJE FROM FACCLISIM ORDER BY IDFAC DESC LIMIT 3');
+    last.forEach(r => console.log(JSON.stringify(r)));
+
+    console.log('\n=== FORMAS DE PAGO (IDFPA) ===');
+    const [fps] = await conn.query('SELECT IDFPA, COUNT(*) as USOS FROM FACCLISIM_COB GROUP BY IDFPA ORDER BY USOS DESC LIMIT 5');
+    fps.forEach(r => console.log(`IDFPA=${r.IDFPA} (usado ${r.USOS} veces)`));
 
   } catch (err) {
     console.error('ERROR:', err.message);
