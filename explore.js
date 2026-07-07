@@ -43,6 +43,12 @@ const mysql = require('mysql2/promise');
     );
     last.forEach(r => console.log(JSON.stringify(r)));
 
+    console.log('\n=== SERIES Y ULTIMO NUMERO (FACCLI) ===');
+    const [series] = await conn.query(
+      'SELECT SERIE, MAX(NUMERO) as ULTIMO FROM FACCLI GROUP BY SERIE ORDER BY SERIE'
+    );
+    series.forEach(r => console.log(`SERIE=${r.SERIE} | ULTIMO=${r.ULTIMO}`));
+
   } catch (err) {
     console.error('ERROR:', err.message);
   } finally {
