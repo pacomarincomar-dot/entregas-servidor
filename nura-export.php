@@ -198,19 +198,7 @@ try {
             $idFac = $pdo->lastInsertId();
             if ($numNura > $ultimoNum) $ultimoNum = $numNura;
 
-            // Descripcion: nombre(s) real(es) del producto concatenados
-            if (!empty($productos)) {
-                $nombres = [];
-                foreach ($productos as $p) {
-                    $n = trim($p['nombre'] ?? '');
-                    if ($n !== '') $nombres[] = $n;
-                }
-                $desc = mb_substr(implode(' / ', $nombres) ?: VDESARTI, 0, 120);
-            } else {
-                $desc = VDESARTI;
-            }
-
-            // ===== INSERT FACCLI_LIN =====
+            // ===== INSERT FACCLI_LIN - una linea por producto =====
             // DPRUFACD     = precio unitario neto (sin IVA)
             // DPRUFACD_IVA = precio unitario con IVA (Nura muestra este)
             // DTOTFACD     = total linea sin IVA
@@ -220,19 +208,50 @@ try {
                 DPRUFACD, DPRUFACD_NETO, DPRUFACD_IVA, DPIVAFACD,
                 IDARTI, DTOTFACD, DTOTFACD_IVA, IORDFACD, VTIPOLINEA
             ) VALUES (
-                :idfac, :codarti, :desarti, 1,
-                :base, :base, :total, :ivapct,
-                :idarti, :base, :total, 1, 'ARTI'
+                :idfac, :codarti, :desarti, :cantidad,
+                :precneto, :precneto, :preciva, :ivapct,
+                :idarti, :totneto, :totiva, :orden, 'ARTI'
             )");
-            $stmtLin->execute([
-                ':idfac'   => $idFac,
-                ':codarti' => VCODARTI,
-                ':desarti' => $desc,
-                ':base'    => $base,
-                ':total'   => $total,
-                ':ivapct'  => IVA_PCT,
-                ':idarti'  => IDARTI,
-            ]);
+
+            if (!empty($productos)) {
+                $orden = 1;
+                foreach ($productos as $p) {
+                    $pNombre   = mb_substr(trim($p['nombre'] ?? ''), 0, 120) ?: VDESARTI;
+                    $pCantidad = floatval($p['cantidad'] ?? 1);
+                    $pPrecIva  = round(floatval($p['precio']   ?? 0), 4);
+                    $pSubtotal = round(floatval($p['subtotal'] ?? ($pPrecIva * $pCantidad)), 4);
+                    $pPrecNeto = round($pPrecIva / (1 + IVA_PCT / 100), 4);
+                    $pTotNeto  = round($pSubtotal / (1 + IVA_PCT / 100), 4);
+                    $stmtLin->execute([
+                        ':idfac'    => $idFac,
+                        ':codarti'  => VCODARTI,
+                        ':desarti'  => $pNombre,
+                        ':cantidad' => $pCantidad,
+                        ':precneto' => $pPrecNeto,
+                        ':preciva'  => $pPrecIva,
+                        ':ivapct'   => IVA_PCT,
+                        ':idarti'   => IDARTI,
+                        ':totneto'  => $pTotNeto,
+                        ':totiva'   => $pSubtotal,
+                        ':orden'    => $orden++,
+                    ]);
+                }
+            } else {
+                // Fallback: una sola linea con el total del ticket
+                $stmtLin->execute([
+                    ':idfac'    => $idFac,
+                    ':codarti'  => VCODARTI,
+                    ':desarti'  => VDESARTI,
+                    ':cantidad' => 1,
+                    ':precneto' => $base,
+                    ':preciva'  => $total,
+                    ':ivapct'   => IVA_PCT,
+                    ':idarti'   => IDARTI,
+                    ':totneto'  => $base,
+                    ':totiva'   => $total,
+                    ':orden'    => 1,
+                ]);
+            }
 
             // ===== INSERT FACCLI_COB =====
             // IDVEN es nullable; el importe se gestiona via vencimientos externos
