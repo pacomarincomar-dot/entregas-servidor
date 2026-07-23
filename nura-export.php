@@ -235,17 +235,16 @@ try {
             ]);
 
             // ===== INSERT FACCLI_COB =====
+            // IDVEN es nullable; el importe se gestiona via vencimientos externos
             $stmtCob = $pdo->prepare("INSERT INTO FACCLI_COB (
-                IDFAC, IDFPA, DIMPORTE, FFECCOB, FFECPREV
+                IDFAC, VTIPCOB, FFECCOB, IDFPA
             ) VALUES (
-                :idfac, :idfpa, :importe, :ffeccob, :ffecprev
+                :idfac, 'CO', :fecha, :idfpa
             )");
             $stmtCob->execute([
-                ':idfac'   => $idFac,
-                ':idfpa'   => IDFPA,
-                ':importe' => $total,
-                ':ffeccob' => $fecha,
-                ':ffecprev' => $fecha,
+                ':idfac' => $idFac,
+                ':fecha' => $fecha,
+                ':idfpa' => IDFPA,
             ]);
 
             $insertadas[] = [
