@@ -83,8 +83,8 @@ if ($accion === 'datos') {
         echo "ERROR: nombre de tabla invalido\n"; exit;
     }
     $where = '';
-    if ($filtro !== '' && preg_match('/^[A-Z0-9_]+=[\w\-]+$/i', $filtro)) {
-        $where = "WHERE $filtro";
+    if ($filtro !== '' && preg_match('/^([A-Z0-9_]+)=([\w\-]+)$/i', $filtro, $fm)) {
+        $where = "WHERE `{$fm[1]}` = '{$fm[2]}'";
     }
     echo "=== DATOS DE $tabla $where (max $limite, offset $offset) ===\n\n";
     try {
