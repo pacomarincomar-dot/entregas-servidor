@@ -30,8 +30,8 @@ define('ID_EMP',    1);
 define('IDFPA',     149);
 define('VCODFPA',   'CON');
 define('VCODCLI',   '000655');
-define('VNCOMCLI',  'PUBLICO');
-define('VNFISCLI',  'PUBLICO');
+define('VNCOMCLI',  'CLIENTE DE CONTADO');
+define('VNFISCLI',  'CLIENTE DE CONTADO');
 define('VCODARTI',  'VARIOSA');
 define('VDESARTI',  'Venta por mostrador varios');
 define('IDARTI',    28893);
@@ -164,20 +164,22 @@ try {
 
             // ===== INSERT FACCLI =====
             $stmtCab = $pdo->prepare("INSERT INTO FACCLI (
-                ID_EMP, ID_EJE, IDCON, VCODCAN, INUMFAC,
+                ID_EMP, ID_PROCESS, VCODCAN, INUMFAC,
                 FFDOCFAC, FFENTFAC, VCODCLI, VNCOMCLI, VNFISCLI,
-                DIMP1FAC, DPIVA1FAC, DIIVA1FAC, DTOTALFAC, DSUMA_IMPONIBLES,
-                VESTADOCOB, VESTADO, VCODFPA, IDFPA, IDALM
+                DIMP1FAC, DPIVA1FAC, DIIVA1FAC, DTOTALFAC,
+                DSUMA_IMPONIBLES, DBASE_TOTAL, DBASE_IRPF,
+                VESTADOCOB, VESTADO, VCODFPA, IDFPA, IDALM,
+                VREGIMEN_IVA, VFUENTE
             ) VALUES (
-                :idemp, :ideje, :idcon, :canal, :inumfac,
+                :idemp, 1004, :canal, :inumfac,
                 :fecha, :fecha, :codcli, :vncomcli, :vnfiscli,
-                :base, :ivapct, :ivacuota, :total, :base,
-                'COB', 'CERR', :vcodfpa, :idfpa, :idalm
+                :base, :ivapct, :ivacuota, :total,
+                :base, :total, :base,
+                'CO', 'CERR', :vcodfpa, :idfpa, :idalm,
+                'GE', 'directo'
             )");
             $stmtCab->execute([
                 ':idemp'    => ID_EMP,
-                ':ideje'    => ID_EJE,
-                ':idcon'    => IDCON_CTR,
                 ':canal'    => CANAL,
                 ':inumfac'  => $inumfac,
                 ':fecha'    => $fecha,
