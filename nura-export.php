@@ -164,19 +164,20 @@ try {
 
             // ===== INSERT FACCLI =====
             $stmtCab = $pdo->prepare("INSERT INTO FACCLI (
-                ID_EMP, ID_EJE, VCODCAN, INUMFAC,
-                FFDOCFAC, VCODCLI, VNCOMCLI, VNFISCLI,
+                ID_EMP, ID_EJE, IDCON, VCODCAN, INUMFAC,
+                FFDOCFAC, FFENTFAC, VCODCLI, VNCOMCLI, VNFISCLI,
                 DIMP1FAC, DPIVA1FAC, DIIVA1FAC, DTOTALFAC, DSUMA_IMPONIBLES,
-                VESTADOCOB, VESTADO, VCODFPA, IDALM
+                VESTADOCOB, VESTADO, VCODFPA, IDFPA, IDALM
             ) VALUES (
-                :idemp, :ideje, :canal, :inumfac,
-                :fecha, :codcli, :vncomcli, :vnfiscli,
+                :idemp, :ideje, :idcon, :canal, :inumfac,
+                :fecha, :fecha, :codcli, :vncomcli, :vnfiscli,
                 :base, :ivapct, :ivacuota, :total, :base,
-                'COB', 'CERR', :vcodfpa, :idalm
+                'COB', 'CERR', :vcodfpa, :idfpa, :idalm
             )");
             $stmtCab->execute([
                 ':idemp'    => ID_EMP,
                 ':ideje'    => ID_EJE,
+                ':idcon'    => IDCON_CTR,
                 ':canal'    => CANAL,
                 ':inumfac'  => $inumfac,
                 ':fecha'    => $fecha,
@@ -188,6 +189,7 @@ try {
                 ':ivacuota' => $cuotaIVA,
                 ':total'    => $total,
                 ':vcodfpa'  => VCODFPA,
+                ':idfpa'    => IDFPA,
                 ':idalm'    => IDALM,
             ]);
 
