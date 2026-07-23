@@ -211,18 +211,18 @@ try {
             }
 
             // ===== INSERT FACCLI_LIN =====
-            // DPRUFACD     = precio unitario sin IVA
-            // DPRUFACD_IVA = precio unitario con IVA (Nura muestra este como "Precio")
+            // DPRUFACD     = precio unitario neto (sin IVA)
+            // DPRUFACD_IVA = precio unitario con IVA (Nura muestra este)
             // DTOTFACD     = total linea sin IVA
-            // DTOTFACD_IVA = total linea con IVA (Nura muestra este como "Total")
+            // DTOTFACD_IVA = total linea con IVA (Nura muestra este)
             $stmtLin = $pdo->prepare("INSERT INTO FACCLI_LIN (
                 IDFAC, VCODARTI, VDESARTI, DCANTIDAD,
-                DPRUFACD, DPRUFACD_IVA, DPIVAFACD,
-                IDARTI, DTOTFACD, DTOTFACD_IVA, IORDEN, IDALM
+                DPRUFACD, DPRUFACD_NETO, DPRUFACD_IVA, DPIVAFACD,
+                IDARTI, DTOTFACD, DTOTFACD_IVA, IORDFACD, VTIPOLINEA
             ) VALUES (
                 :idfac, :codarti, :desarti, 1,
-                :base, :total, :ivapct,
-                :idarti, :base, :total, 1, :idalm
+                :base, :base, :total, :ivapct,
+                :idarti, :base, :total, 1, 'ARTI'
             )");
             $stmtLin->execute([
                 ':idfac'   => $idFac,
@@ -232,7 +232,6 @@ try {
                 ':total'   => $total,
                 ':ivapct'  => IVA_PCT,
                 ':idarti'  => IDARTI,
-                ':idalm'   => IDALM,
             ]);
 
             // ===== INSERT FACCLI_COB =====
