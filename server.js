@@ -332,43 +332,38 @@ app.delete('/api/whatsapp/sesion', (req, res) => {
 });
 
 // ===== CLIENTES =====
-// Buscar cliente por telefono (para cruzar con numero de WhatsApp)
-// Tablas NuraGestion: ARCCLI, campos VTELF1/VTELF2/VMOVIL
+// TODO: Rellenar con la tabla/campos correctos de la BD de Entregas
+// Ver tablas disponibles en: /api/db-explore/all-tables
+// Campos necesarios: id/codigo, nombre, direccion, telefono/movil
+const CLI_TABLE  = process.env.CLI_TABLE  || 'TODO_clientes';
+const CLI_ID     = process.env.CLI_ID     || 'id';
+const CLI_NOMBRE = process.env.CLI_NOMBRE || 'nombre';
+const CLI_DIR    = process.env.CLI_DIR    || 'direccion';
+const CLI_TEL    = process.env.CLI_TEL    || 'telefono';
+
 app.get('/api/clientes/buscar', async (req, res) => {
+  if (CLI_TABLE === 'TODO_clientes') {
+    return res.status(501).json({ error: 'Tabla de clientes no configurada. Revisa CLI_TABLE en .env' });
+  }
   const { telefono, q } = req.query;
   try {
     let rows;
     if (telefono) {
       const tel = (telefono || '').replace(/\s/g, '');
-      // Buscar con y sin prefijo pais
-      const tel34 = tel.startsWith('34') ? tel : '34' + tel;
-      const telSin = tel.startsWith('34') ? tel.slice(2) : tel;
+      const ultNueve = tel.slice(-9);
       [rows] = await dbPool.query(
-        `SELECT VCODCLI AS codigo, VNOMCLI AS nombre, VDIRCLI AS direccion,
-                VCPOCLI AS cp, VPOBCLI AS poblacion, VTELF1 AS telf1, VMOVIL AS movil
-         FROM ARCCLI
-         WHERE REPLACE(VTELF1,' ','') IN (?,?) OR REPLACE(VTELF2,' ','') IN (?,?)
-            OR REPLACE(VMOVIL,' ','') IN (?,?)
-         LIMIT 3`,
-        [tel, tel34, tel, tel34, tel, tel34]
+        `SELECT ${CLI_ID} AS codigo, ${CLI_NOMBRE} AS nombre, ${CLI_DIR} AS direccion,
+                ${CLI_TEL} AS telefono
+         FROM ${CLI_TABLE}
+         WHERE RIGHT(REPLACE(${CLI_TEL},' ',''),9)=?
+         LIMIT 5`,
+        [ultNueve]
       );
-      // Si no encuentra con prefijo, busca solo los 9 últimos dígitos
-      if (!rows.length) {
-        const ultNueve = telSin.slice(-9);
-        [rows] = await dbPool.query(
-          `SELECT VCODCLI AS codigo, VNOMCLI AS nombre, VDIRCLI AS direccion,
-                  VCPOCLI AS cp, VPOBCLI AS poblacion, VTELF1 AS telf1, VMOVIL AS movil
-           FROM ARCCLI
-           WHERE RIGHT(REPLACE(VTELF1,' ',''),9)=? OR RIGHT(REPLACE(VMOVIL,' ',''),9)=?
-           LIMIT 3`,
-          [ultNueve, ultNueve]
-        );
-      }
     } else if (q) {
       [rows] = await dbPool.query(
-        `SELECT VCODCLI AS codigo, VNOMCLI AS nombre, VDIRCLI AS direccion,
-                VCPOCLI AS cp, VPOBCLI AS poblacion, VTELF1 AS telf1, VMOVIL AS movil
-         FROM ARCCLI WHERE VNOMCLI LIKE ? ORDER BY VNOMCLI LIMIT 10`,
+        `SELECT ${CLI_ID} AS codigo, ${CLI_NOMBRE} AS nombre, ${CLI_DIR} AS direccion,
+                ${CLI_TEL} AS telefono
+         FROM ${CLI_TABLE} WHERE ${CLI_NOMBRE} LIKE ? ORDER BY ${CLI_NOMBRE} LIMIT 10`,
         [`%${q}%`]
       );
     } else {
@@ -381,20 +376,27 @@ app.get('/api/clientes/buscar', async (req, res) => {
 });
 
 // ===== ARTICULOS =====
-// Buscar articulo por nombre aproximado
-// Tablas NuraGestion: ARCART, campos VCODART/VNOMCOR/VNOMLAR/PPVP1
+// TODO: Rellenar con la tabla/campos correctos de la BD de Entregas
+const ART_TABLE   = process.env.ART_TABLE   || 'TODO_articulos';
+const ART_ID      = process.env.ART_ID      || 'id';
+const ART_NOMBRE  = process.env.ART_NOMBRE  || 'nombre';
+const ART_PRECIO  = process.env.ART_PRECIO  || 'precio';
+
 app.get('/api/articulos/buscar', async (req, res) => {
+  if (ART_TABLE === 'TODO_articulos') {
+    return res.status(501).json({ error: 'Tabla de articulos no configurada. Revisa ART_TABLE en .env' });
+  }
   const { q } = req.query;
   if (!q || q.length < 2) return res.status(400).json({ error: 'Parametro q requerido (min 2 chars)' });
   try {
     const terminos = q.trim().split(/\s+/).filter(t => t.length >= 2);
-    let sql = `SELECT VCODART AS codigo, VNOMCOR AS nombre, VNOMLAR AS nombreLargo,
-                      PPVP1 AS pvp1, PPVP2 AS pvp2, PPVP3 AS pvp3
-               FROM ARCART WHERE `;
-    const conds = terminos.map(() => '(VNOMCOR LIKE ? OR VNOMLAR LIKE ?)').join(' AND ');
-    const params = terminos.flatMap(t => [`%${t}%`, `%${t}%`]);
-    sql += conds + ' ORDER BY VNOMCOR LIMIT 8';
-    const [rows] = await dbPool.query(sql, params);
+    const conds = terminos.map(() => `${ART_NOMBRE} LIKE ?`).join(' AND ');
+    const params = terminos.map(t => `%${t}%`);
+    const [rows] = await dbPool.query(
+      `SELECT ${ART_ID} AS codigo, ${ART_NOMBRE} AS nombre, ${ART_PRECIO} AS precio
+       FROM ${ART_TABLE} WHERE ${conds} ORDER BY ${ART_NOMBRE} LIMIT 8`,
+      params
+    );
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
