@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const mysql = require('mysql2/promise');
+const wa = require('./whatsapp');
 
 const app = express();
 app.use(cors());
@@ -306,6 +307,102 @@ app.post('/api/claude', async (req, res) => {
   }
 });
  
+// ===== WHATSAPP =====
+
+app.get('/api/whatsapp/status', (req, res) => {
+  res.json(wa.getStatus());
+});
+
+app.get('/api/whatsapp/chats', (req, res) => {
+  const chats = wa.getLabeledChats();
+  if (chats === null) return res.status(503).json({ error: 'WhatsApp no conectado' });
+  res.json(chats);
+});
+
+app.delete('/api/whatsapp/sesion', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const authDir = path.join(__dirname, '.wa-auth');
+  try {
+    fs.rmSync(authDir, { recursive: true, force: true });
+    res.json({ ok: true, msg: 'Sesion eliminada. Reinicia el servidor para escanear QR.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===== CLIENTES =====
+// Buscar cliente por telefono (para cruzar con numero de WhatsApp)
+// Tablas NuraGestion: ARCCLI, campos VTELF1/VTELF2/VMOVIL
+app.get('/api/clientes/buscar', async (req, res) => {
+  const { telefono, q } = req.query;
+  try {
+    let rows;
+    if (telefono) {
+      const tel = (telefono || '').replace(/\s/g, '');
+      // Buscar con y sin prefijo pais
+      const tel34 = tel.startsWith('34') ? tel : '34' + tel;
+      const telSin = tel.startsWith('34') ? tel.slice(2) : tel;
+      [rows] = await dbPool.query(
+        `SELECT VCODCLI AS codigo, VNOMCLI AS nombre, VDIRCLI AS direccion,
+                VCPOCLI AS cp, VPOBCLI AS poblacion, VTELF1 AS telf1, VMOVIL AS movil
+         FROM ARCCLI
+         WHERE REPLACE(VTELF1,' ','') IN (?,?) OR REPLACE(VTELF2,' ','') IN (?,?)
+            OR REPLACE(VMOVIL,' ','') IN (?,?)
+         LIMIT 3`,
+        [tel, tel34, tel, tel34, tel, tel34]
+      );
+      // Si no encuentra con prefijo, busca solo los 9 últimos dígitos
+      if (!rows.length) {
+        const ultNueve = telSin.slice(-9);
+        [rows] = await dbPool.query(
+          `SELECT VCODCLI AS codigo, VNOMCLI AS nombre, VDIRCLI AS direccion,
+                  VCPOCLI AS cp, VPOBCLI AS poblacion, VTELF1 AS telf1, VMOVIL AS movil
+           FROM ARCCLI
+           WHERE RIGHT(REPLACE(VTELF1,' ',''),9)=? OR RIGHT(REPLACE(VMOVIL,' ',''),9)=?
+           LIMIT 3`,
+          [ultNueve, ultNueve]
+        );
+      }
+    } else if (q) {
+      [rows] = await dbPool.query(
+        `SELECT VCODCLI AS codigo, VNOMCLI AS nombre, VDIRCLI AS direccion,
+                VCPOCLI AS cp, VPOBCLI AS poblacion, VTELF1 AS telf1, VMOVIL AS movil
+         FROM ARCCLI WHERE VNOMCLI LIKE ? ORDER BY VNOMCLI LIMIT 10`,
+        [`%${q}%`]
+      );
+    } else {
+      return res.status(400).json({ error: 'Falta telefono o q' });
+    }
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===== ARTICULOS =====
+// Buscar articulo por nombre aproximado
+// Tablas NuraGestion: ARCART, campos VCODART/VNOMCOR/VNOMLAR/PPVP1
+app.get('/api/articulos/buscar', async (req, res) => {
+  const { q } = req.query;
+  if (!q || q.length < 2) return res.status(400).json({ error: 'Parametro q requerido (min 2 chars)' });
+  try {
+    const terminos = q.trim().split(/\s+/).filter(t => t.length >= 2);
+    let sql = `SELECT VCODART AS codigo, VNOMCOR AS nombre, VNOMLAR AS nombreLargo,
+                      PPVP1 AS pvp1, PPVP2 AS pvp2, PPVP3 AS pvp3
+               FROM ARCART WHERE `;
+    const conds = terminos.map(() => '(VNOMCOR LIKE ? OR VNOMLAR LIKE ?)').join(' AND ');
+    const params = terminos.flatMap(t => [`%${t}%`, `%${t}%`]);
+    sql += conds + ' ORDER BY VNOMCOR LIMIT 8';
+    const [rows] = await dbPool.query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===== INICIO =====
 app.listen(PORT, () => {
   console.log('Servidor Entregas corriendo en puerto ' + PORT);
+  wa.startWhatsApp().catch(err => console.error('[WhatsApp] Error al iniciar:', err.message));
 });
