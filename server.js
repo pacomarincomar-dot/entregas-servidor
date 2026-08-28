@@ -21,6 +21,35 @@ const dbPool = mysql.createPool({
   connectionLimit: 10
 });
 
+// BD Ionos (entregas_data)
+const ionosPool = mysql.createPool({
+  host: process.env.IONOS_DB_HOST || 'db5020454613.hosting-data.io',
+  port: process.env.IONOS_DB_PORT || 3306,
+  user: process.env.IONOS_DB_USER || 'dbu120493',
+  password: process.env.IONOS_DB_PASS,
+  database: process.env.IONOS_DB_NAME || 'dbs15673372',
+  waitForConnections: true,
+  connectionLimit: 5,
+  connectTimeout: 10000,
+});
+
+// Cache del JSON principal (TTL 60s)
+let entregasCache = null;
+let entregasCacheTs = 0;
+
+async function getEntregasData(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && entregasCache && (now - entregasCacheTs) < 60000) {
+    return entregasCache;
+  }
+  const [[row]] = await ionosPool.query(
+    "SELECT data_value FROM entregas_data WHERE data_key = 'main' LIMIT 1"
+  );
+  entregasCache = JSON.parse(row.data_value);
+  entregasCacheTs = now;
+  return entregasCache;
+}
+
 function round4(n) { return Math.round(n * 10000) / 10000; }
 function round2(n) { return Math.round(n * 100) / 100; }
 
@@ -331,73 +360,47 @@ app.delete('/api/whatsapp/sesion', (req, res) => {
   }
 });
 
-// ===== CLIENTES =====
-// TODO: Rellenar con la tabla/campos correctos de la BD de Entregas
-// Ver tablas disponibles en: /api/db-explore/all-tables
-// Campos necesarios: id/codigo, nombre, direccion, telefono/movil
-const CLI_TABLE  = process.env.CLI_TABLE  || 'TODO_clientes';
-const CLI_ID     = process.env.CLI_ID     || 'id';
-const CLI_NOMBRE = process.env.CLI_NOMBRE || 'nombre';
-const CLI_DIR    = process.env.CLI_DIR    || 'direccion';
-const CLI_TEL    = process.env.CLI_TEL    || 'telefono';
-
+// ===== CLIENTES (BD Ionos - entregas_data) =====
 app.get('/api/clientes/buscar', async (req, res) => {
-  if (CLI_TABLE === 'TODO_clientes') {
-    return res.status(501).json({ error: 'Tabla de clientes no configurada. Revisa CLI_TABLE en .env' });
-  }
   const { telefono, q } = req.query;
   try {
-    let rows;
+    const data = await getEntregasData();
+    const clientes = data.clientes || [];
+
+    let resultado;
     if (telefono) {
-      const tel = (telefono || '').replace(/\s/g, '');
-      const ultNueve = tel.slice(-9);
-      [rows] = await dbPool.query(
-        `SELECT ${CLI_ID} AS codigo, ${CLI_NOMBRE} AS nombre, ${CLI_DIR} AS direccion,
-                ${CLI_TEL} AS telefono
-         FROM ${CLI_TABLE}
-         WHERE RIGHT(REPLACE(${CLI_TEL},' ',''),9)=?
-         LIMIT 5`,
-        [ultNueve]
-      );
+      const ultNueve = telefono.replace(/\s/g, '').slice(-9);
+      resultado = clientes.filter(c => {
+        const tel = (c.telefono || '').replace(/\s/g, '');
+        return tel.slice(-9) === ultNueve;
+      });
     } else if (q) {
-      [rows] = await dbPool.query(
-        `SELECT ${CLI_ID} AS codigo, ${CLI_NOMBRE} AS nombre, ${CLI_DIR} AS direccion,
-                ${CLI_TEL} AS telefono
-         FROM ${CLI_TABLE} WHERE ${CLI_NOMBRE} LIKE ? ORDER BY ${CLI_NOMBRE} LIMIT 10`,
-        [`%${q}%`]
-      );
+      const term = q.toLowerCase();
+      resultado = clientes.filter(c =>
+        (c.nombre || '').toLowerCase().includes(term)
+      ).slice(0, 10);
     } else {
       return res.status(400).json({ error: 'Falta telefono o q' });
     }
-    res.json(rows);
+    res.json(resultado);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ===== ARTICULOS =====
-// TODO: Rellenar con la tabla/campos correctos de la BD de Entregas
-const ART_TABLE   = process.env.ART_TABLE   || 'TODO_articulos';
-const ART_ID      = process.env.ART_ID      || 'id';
-const ART_NOMBRE  = process.env.ART_NOMBRE  || 'nombre';
-const ART_PRECIO  = process.env.ART_PRECIO  || 'precio';
-
+// ===== PRODUCTOS (BD Ionos - entregas_data) =====
 app.get('/api/articulos/buscar', async (req, res) => {
-  if (ART_TABLE === 'TODO_articulos') {
-    return res.status(501).json({ error: 'Tabla de articulos no configurada. Revisa ART_TABLE en .env' });
-  }
   const { q } = req.query;
   if (!q || q.length < 2) return res.status(400).json({ error: 'Parametro q requerido (min 2 chars)' });
   try {
-    const terminos = q.trim().split(/\s+/).filter(t => t.length >= 2);
-    const conds = terminos.map(() => `${ART_NOMBRE} LIKE ?`).join(' AND ');
-    const params = terminos.map(t => `%${t}%`);
-    const [rows] = await dbPool.query(
-      `SELECT ${ART_ID} AS codigo, ${ART_NOMBRE} AS nombre, ${ART_PRECIO} AS precio
-       FROM ${ART_TABLE} WHERE ${conds} ORDER BY ${ART_NOMBRE} LIMIT 8`,
-      params
-    );
-    res.json(rows);
+    const data = await getEntregasData();
+    const productos = data.productos || [];
+    const terminos = q.trim().toLowerCase().split(/\s+/).filter(t => t.length >= 2);
+    const resultado = productos.filter(p => {
+      const nombre = (p.nombre || '').toLowerCase();
+      return terminos.every(t => nombre.includes(t));
+    }).slice(0, 8);
+    res.json(resultado);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
