@@ -406,6 +406,32 @@ app.get('/api/articulos/buscar', async (req, res) => {
   }
 });
 
+// ===== ENTREGAS (Ionos - crea pedido desde WhatsApp) =====
+app.post('/api/entregas', async (req, res) => {
+  try {
+    const data = await getEntregasData();
+    if (!data.entregas) data.entregas = [];
+    const id = Date.now();
+    const entrega = { id, fecha: new Date().toISOString(), ...req.body };
+    data.entregas.unshift(entrega);
+    await ionosPool.query(
+      "UPDATE entregas_data SET data_value = ? WHERE data_key = 'main'",
+      [JSON.stringify(data)]
+    );
+    entregasCache = data;
+    entregasCacheTs = Date.now();
+    res.json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Servir WhatsApp UI
+app.get('/whatsapp', (req, res) => {
+  const path = require('path');
+  res.sendFile(path.join(__dirname, 'WhatsApp.html'));
+});
+
 // ===== INICIO =====
 app.listen(PORT, () => {
   console.log('Servidor Entregas corriendo en puerto ' + PORT);
