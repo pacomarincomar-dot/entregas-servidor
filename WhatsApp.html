@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Pedidos</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green: #25D366;
+  --green-dark: #128C7E;
+  --blue: #2563eb;
+  --orange: #ea580c;
+  --bg: #f0f2f5;
+  --card: #fff;
+  --text: #111b21;
+  --text2: #667781;
+  --border: #e9edef;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.app-wrap {
+  max-width: 600px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.app-header {
+  background: var(--green-dark);
+  color: #fff;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.app-header h1 { font-size: 1.1rem; font-weight: 600; flex: 1; }
+.btn-back {
+  background: none; border: none; color: #fff;
+  font-size: 1rem; cursor: pointer; padding: 4px 8px 4px 0;
+  line-height: 1;
+}
+.btn-refresh {
+  background: rgba(255,255,255,.2); border: none; color: #fff;
+  width: 34px; height: 34px; border-radius: 50%; font-size: 1.1rem;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.btn-refresh:active { background: rgba(255,255,255,.35); }
+
+/* Status bar */
+.status-bar {
+  padding: 8px 16px;
+  font-size: .82rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-bar.connected { background: #dcfce7; color: #15803d; }
+.status-bar.disconnected { background: #fef9c3; color: #854d0e; }
+.status-bar.error { background: #fee2e2; color: #991b1b; }
+.status-bar.info { background: #e0f2fe; color: #0369a1; }
+.status-bar button {
+  margin-left: auto;
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: .8rem;
+}
+
+/* Content */
+.content { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+/* QR */
+.qr-wrap {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 24px 16px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.qr-wrap p { margin-bottom: 16px; color: var(--text2); font-size: .9rem; }
+.qr-wrap img { max-width: 260px; width: 100%; border: 1px solid var(--border); border-radius: 8px; }
+
+/* Chat cards */
+.chat-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  cursor: pointer;
+  transition: box-shadow .15s;
+}
+.chat-card:active { box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.chat-name { font-weight: 600; flex: 1; }
+.label-badge {
+  font-size: .72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.label-badge.llevar { background: #dbeafe; color: #1d4ed8; }
+.label-badge.enviar { background: #ffedd5; color: #c2410c; }
+.label-badge { background: #f3f4f6; color: #374151; }
+
+.chat-phone { font-size: .8rem; color: var(--text2); margin-bottom: 8px; }
+
+.chat-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.pill {
+  background: #f3f4f6;
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: .78rem;
+  color: #374151;
+}
+.chat-msg {
+  font-size: .85rem;
+  color: var(--text2);
+  white-space: pre-wrap;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 10px;
+  max-height: 60px;
+  overflow: hidden;
+}
+
+.btn-crear {
+  width: 100%;
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-crear:active { background: var(--green-dark); }
+
+/* No data */
+.no-data {
+  text-align: center;
+  color: var(--text2);
+  padding: 40px 16px;
+  font-size: .95rem;
+}
+
+/* Pedido form */
+.section {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+.section h2 {
+  font-size: .8rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text2);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+/* Cliente */
+.cliente-info { font-size: .92rem; line-height: 1.6; }
+.cliente-nombre { font-weight: 600; font-size: 1rem; }
+.cliente-dir, .cliente-tel { color: var(--text2); }
+
+.no-cliente { color: var(--text2); font-size: .88rem; margin-bottom: 8px; }
+.search-row { display: flex; gap: 6px; }
+.search-row input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: .9rem;
+}
+.search-row button {
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: .9rem;
+}
+.search-results { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.search-result-item {
+  padding: 8px 10px;
+  background: #f9fafb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .88rem;
+  border: 1px solid var(--border);
+}
+.search-result-item:hover { background: #eff6ff; }
+
+/* Lineas */
+.linea-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+.linea-row:last-child { margin-bottom: 0; }
+.linea-original {
+  font-size: .8rem;
+  color: var(--text2);
+  margin-bottom: 6px;
+  font-style: italic;
+}
+.linea-articulo { margin-bottom: 8px; }
+.linea-articulo select {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: .88rem;
+  background: #fff;
+}
+.linea-nums {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.linea-nums label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .82rem;
+  color: var(--text2);
+}
+.linea-nums input[type=number] {
+  width: 72px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: .9rem;
+  text-align: right;
+}
+.linea-total {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: .95rem;
+}
+.linea-no-match { font-size: .82rem; color: #dc2626; }
+
+/* Footer */
+.pedido-footer {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.total-row {
+  text-align: right;
+  font-size: 1.1rem;
+}
+.btn-primary {
+  width: 100%;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 13px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+.btn-primary:not(:disabled):active { background: #1d4ed8; }
+
+.success-box {
+  background: #dcfce7;
+  color: #15803d;
+  border-radius: var(--radius);
+  padding: 24px;
+  text-align: center;
+  font-size: 1rem;
+  box-shadow: var(--shadow);
+}
+.success-box .icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+.error-msg { color: #dc2626; font-size: .85rem; }
+
+/* Mensaje */
+details summary {
+  cursor: pointer;
+  font-size: .82rem;
+  color: var(--text2);
+  font-weight: 600;
+  list-style: none;
+  user-select: none;
+}
+details summary::before { content: '▶ '; }
+details[open] summary::before { content: '▼ '; }
+.msg-pre {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-size: .85rem;
+  color: var(--text);
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: inherit;
+}
+
+.loading-inline { color: var(--text2); font-size: .85rem; }
+.spinner { display: inline-block; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="app-wrap" id="app"></div>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────
+const S = {
+  waStatus: null,
+  chats: [],
+  loading: true,
+  view: 'list',          // 'list' | 'pedido' | 'done'
+  chatIdx: null,
+  pedido: null,          // { chat, cliente, clienteLoading, clienteSearch, searchResults, lineas, saving, error }
+};
+
+// ── Utils ───────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmt2(n) { return (parseFloat(n)||0).toFixed(2); }
+function lineTotal(l) { return l.cantidad * (parseFloat(l.precio)||0); }
+
+// ── API ─────────────────────────────────────────────────
+async function get(path) {
+  const r = await fetch(path);
+  if (!r.ok) { const e = await r.json().catch(()=>({error:r.statusText})); throw new Error(e.error||r.statusText); }
+  return r.json();
+}
+async function post(path, body) {
+  const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  if (!r.ok) { const e = await r.json().catch(()=>({error:r.statusText})); throw new Error(e.error||r.statusText); }
+  return r.json();
+}
+async function del(path) {
+  const r = await fetch(path, { method:'DELETE' });
+  return r.json().catch(()=>({}));
+}
+
+// ── Data loading ────────────────────────────────────────
+async function loadStatus() {
+  try { S.waStatus = await get('/api/whatsapp/status'); }
+  catch(e) { S.waStatus = { connected: false, error: e.message }; }
+}
+async function loadChats() {
+  try { S.chats = await get('/api/whatsapp/chats'); }
+  catch(e) { S.chats = []; }
+}
+async function refreshAll() {
+  S.loading = true;
+  render();
+  await Promise.all([loadStatus(), loadChats()]);
+  S.loading = false;
+  render();
+}
+
+// ── Pedido flow ─────────────────────────────────────────
+async function openPedido(idx) {
+  const chat = S.chats[idx];
+  S.chatIdx = idx;
+  S.view = 'pedido';
+  S.pedido = {
+    chat,
+    cliente: null,
+    clienteLoading: !!chat.phone,
+    clienteSearch: '',
+    searchResults: [],
+    lineas: chat.lineas.map(l => ({
+      original: l,
+      articuloLoading: l.descripcion.length >= 2,
+      matches: [],
+      articuloId: null,
+      articuloNombre: '',
+      cantidad: l.cantidad,
+      precio: 0,
+    })),
+    saving: false,
+    error: null,
+  };
+  render();
+
+  // Load client by phone
+  if (chat.phone) {
+    try {
+      const res = await get(`/api/clientes/buscar?telefono=${encodeURIComponent(chat.phone)}`);
+      S.pedido.cliente = res[0] || null;
+    } catch(e) { S.pedido.cliente = null; }
+    S.pedido.clienteLoading = false;
+    render();
+  }
+
+  // Load product matches in parallel
+  await Promise.all(S.pedido.lineas.map(async (linea, i) => {
+    if (linea.original.descripcion.length < 2) { linea.articuloLoading = false; return; }
+    try {
+      const matches = await get(`/api/articulos/buscar?q=${encodeURIComponent(linea.original.descripcion)}`);
+      linea.matches = matches;
+      if (matches.length) {
+        linea.articuloId = matches[0].id ?? null;
+        linea.articuloNombre = matches[0].nombre || '';
+        linea.precio = matches[0].precio || 0;
+      }
+    } catch(e) { linea.matches = []; }
+    linea.articuloLoading = false;
+    render();
+  }));
+}
+
+async function confirmarPedido() {
+  const p = S.pedido;
+  p.saving = true;
+  p.error = null;
+  render();
+
+  const total = p.lineas.reduce((s,l) => s + lineTotal(l), 0);
+  try {
+    await post('/api/entregas', {
+      estado: 'pendiente',
+      etiqueta: p.chat.etiquetas?.[0] || '',
+      whatsapp: {
+        jid: p.chat.jid,
+        nombre: p.chat.nombre,
+        telefono: p.chat.phone,
+        mensaje: p.chat.mensaje,
+      },
+      cliente: p.cliente,
+      lineas: p.lineas.map(l => ({
+        descripcion: l.original.descripcion,
+        cantidad: l.cantidad,
+        articuloId: l.articuloId,
+        articuloNombre: l.articuloNombre,
+        precio: parseFloat(l.precio)||0,
+        total: Math.round(lineTotal(l)*100)/100,
+      })),
+      total: Math.round(total*100)/100,
+    });
+    // Remove chat from list
+    S.chats.splice(S.chatIdx, 1);
+    S.view = 'done';
+  } catch(e) {
+    p.error = e.message;
+  }
+  p.saving = false;
+  render();
+}
+
+async function buscarCliente(q) {
+  if (!q || q.length < 2) { S.pedido.searchResults = []; render(); return; }
+  try {
+    const res = await get(`/api/clientes/buscar?q=${encodeURIComponent(q)}`);
+    S.pedido.searchResults = res;
+  } catch(e) { S.pedido.searchResults = []; }
+  render();
+}
+
+function seleccionarCliente(c) {
+  S.pedido.cliente = c;
+  S.pedido.clienteSearch = '';
+  S.pedido.searchResults = [];
+  render();
+}
+
+// ── Render ───────────────────────────────────────────────
+function render() {
+  document.getElementById('app').innerHTML = buildHtml();
+}
+
+function buildHtml() {
+  if (S.view === 'done') return buildDone();
+  if (S.view === 'pedido') return buildPedido();
+  return buildList();
+}
+
+function buildList() {
+  const st = S.waStatus;
+  let statusBar = '';
+  if (!st) {
+    statusBar = `<div class="status-bar info"><span class="spinner">⟳</span> Conectando…</div>`;
+  } else if (st.connected) {
+    statusBar = `<div class="status-bar connected">● WhatsApp conectado · ${S.chats.length} chat${S.chats.length!==1?'s':''}</div>`;
+  } else if (st.error === 'loggedOut') {
+    statusBar = `<div class="status-bar error">Sesión cerrada <button onclick="resetSession()">Reiniciar</button></div>`;
+  } else {
+    statusBar = `<div class="status-bar disconnected">○ Sin conexión — esperando QR</div>`;
+  }
+
+  let body = '';
+  if (st && !st.connected && st.qrBase64) {
+    body = `<div class="qr-wrap">
+      <p>Escanea con <strong>WhatsApp Business</strong><br>Menú → Dispositivos vinculados → Vincular dispositivo</p>
+      <img src="${esc(st.qrBase64)}" alt="QR WhatsApp">
+    </div>`;
+  } else if (S.loading) {
+    body = `<div class="no-data"><span class="spinner">⟳</span> Cargando…</div>`;
+  } else if (!st?.connected) {
+    body = `<div class="no-data">WhatsApp no conectado.<br>Espera a que aparezca el código QR.</div>`;
+  } else if (!S.chats.length) {
+    body = `<div class="no-data">No hay chats con etiqueta Llevar / Enviar.<br><br>Los chats etiquetados aparecerán aquí automáticamente.</div>`;
+  } else {
+    body = S.chats.map((chat, i) => {
+      const etq = (chat.etiquetas?.[0] || '').toLowerCase();
+      const pills = chat.lineas.slice(0,4).map(l =>
+        `<span class="pill">${esc(l.descripcion)}${l.cantidad>1?` ×${l.cantidad}`:''}</span>`
+      ).join('');
+      const morePills = chat.lineas.length > 4
+        ? `<span class="pill">+${chat.lineas.length-4} más</span>` : '';
+      return `
+      <div class="chat-card">
+        <div class="chat-header">
+          <span class="chat-name">${esc(chat.nombre)}</span>
+          <span class="label-badge ${etq}">${esc(chat.etiquetas?.[0]||'')}</span>
+        </div>
+        <div class="chat-phone">📱 ${esc(chat.phone)}</div>
+        ${chat.lineas.length
+          ? `<div class="chat-pills">${pills}${morePills}</div>`
+          : `<div class="chat-msg">${esc((chat.mensaje||'').slice(0,100))}</div>`
+        }
+        <button class="btn-crear" onclick="openPedido(${i})">Crear pedido →</button>
+      </div>`;
+    }).join('');
+  }
+
+  return `
+  <div class="app-header">
+    <h1>WhatsApp Pedidos</h1>
+    <button class="btn-refresh" onclick="refreshAll()" title="Actualizar">⟳</button>
+  </div>
+  ${statusBar}
+  <div class="content">${body}</div>`;
+}
+
+function buildPedido() {
+  const p = S.pedido;
+  const chat = p.chat;
+  const etq = (chat.etiquetas?.[0] || '').toLowerCase();
+  const total = p.lineas.reduce((s,l) => s + lineTotal(l), 0);
+
+  // Cliente section
+  let clienteHtml;
+  if (p.clienteLoading) {
+    clienteHtml = `<div class="loading-inline"><span class="spinner">⟳</span> Buscando cliente…</div>`;
+  } else if (p.cliente) {
+    clienteHtml = `
+      <div class="cliente-info">
+        <div class="cliente-nombre">${esc(p.cliente.nombre||'')}</div>
+        ${p.cliente.direccion ? `<div class="cliente-dir">📍 ${esc(p.cliente.direccion)}</div>` : ''}
+        ${p.cliente.telefono ? `<div class="cliente-tel">📱 ${esc(p.cliente.telefono)}</div>` : ''}
+        <div style="margin-top:6px">
+          <button onclick="S.pedido.cliente=null;render()" style="font-size:.75rem;color:#6b7280;background:none;border:none;cursor:pointer;padding:0">Cambiar cliente</button>
+        </div>
+      </div>`;
+  } else {
+    const results = p.searchResults.map(c =>
+      `<div class="search-result-item" onclick="seleccionarCliente(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+        ${esc(c.nombre||'')} ${c.telefono ? `<span style="color:#9ca3af">· ${esc(c.telefono)}</span>` : ''}
+       </div>`
+    ).join('');
+    clienteHtml = `
+      <div class="no-cliente">No encontrado por teléfono. Busca manualmente:</div>
+      <div class="search-row">
+        <input type="text" id="inp-cli" placeholder="Nombre del cliente…"
+          value="${esc(p.clienteSearch)}"
+          oninput="S.pedido.clienteSearch=this.value;buscarCliente(this.value)">
+        <button onclick="buscarCliente(document.getElementById('inp-cli').value)">Buscar</button>
+      </div>
+      ${results ? `<div class="search-results">${results}</div>` : ''}`;
+  }
+
+  // Lineas section
+  const lineasHtml = p.lineas.length === 0
+    ? `<div class="no-data" style="padding:16px">No se detectaron líneas de pedido en el mensaje.</div>`
+    : p.lineas.map((l, i) => {
+        const opts = [
+          `<option value="">— Sin artículo —</option>`,
+          ...l.matches.map(a =>
+            `<option value="${esc(a.id??'')}" data-nombre="${esc(a.nombre||'')}" data-precio="${esc(a.precio||0)}" ${String(l.articuloId)===String(a.id)?'selected':''}>${esc(a.nombre||'')}</option>`
+          )
+        ].join('');
+
+        return `
+        <div class="linea-row">
+          <div class="linea-original">«${esc(l.original.descripcion)}»</div>
+          ${l.articuloLoading
+            ? `<div class="loading-inline"><span class="spinner">⟳</span> Buscando artículo…</div>`
+            : l.matches.length === 0
+              ? `<div class="linea-no-match">Sin coincidencia en catálogo</div>`
+              : `<div class="linea-articulo"><select onchange="cambiarArticulo(${i},this)">${opts}</select></div>`
+          }
+          <div class="linea-nums">
+            <label>Cant
+              <input type="number" min="0.5" step="0.5" value="${l.cantidad}"
+                onchange="S.pedido.lineas[${i}].cantidad=parseFloat(this.value)||1;updateFooter()">
+            </label>
+            <label>€/u
+              <input type="number" min="0" step="0.01" value="${fmt2(l.precio)}"
+                onchange="S.pedido.lineas[${i}].precio=parseFloat(this.value)||0;updateFooter()">
+            </label>
+            <span class="linea-total" id="lt-${i}">= €${fmt2(lineTotal(l))}</span>
+          </div>
+        </div>`;
+      }).join('');
+
+  return `
+  <div class="app-header">
+    <button class="btn-back" onclick="goBack()">←</button>
+    <h1>${esc(chat.nombre)}</h1>
+    <span class="label-badge ${etq}">${esc(chat.etiquetas?.[0]||'')}</span>
+  </div>
+  <div class="content">
+    <div class="section">
+      <h2>Cliente</h2>
+      ${clienteHtml}
+    </div>
+
+    <div class="section">
+      <h2>Artículos</h2>
+      ${lineasHtml}
+    </div>
+
+    <div class="section">
+      <details>
+        <summary>Mensaje original</summary>
+        <pre class="msg-pre">${esc(chat.mensaje)}</pre>
+      </details>
+    </div>
+
+    <div class="pedido-footer">
+      <div class="total-row" id="total-row">Total: <strong>€${fmt2(total)}</strong></div>
+      ${p.error ? `<div class="error-msg">⚠ ${esc(p.error)}</div>` : ''}
+      <button class="btn-primary" ${p.saving?'disabled':''} onclick="confirmarPedido()">
+        ${p.saving ? `<span class="spinner">⟳</span> Guardando…` : 'Confirmar pedido'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function buildDone() {
+  const chat = S.pedido?.chat;
+  return `
+  <div class="app-header">
+    <h1>WhatsApp Pedidos</h1>
+    <button class="btn-refresh" onclick="refreshAll()" title="Actualizar">⟳</button>
+  </div>
+  <div class="content">
+    <div class="success-box">
+      <div class="icon">✅</div>
+      Pedido de <strong>${esc(chat?.nombre||'')}</strong> guardado correctamente.
+      <br><br>
+      <button class="btn-primary" style="max-width:240px;margin:0 auto" onclick="S.view='list';render()">Ver más pedidos</button>
+    </div>
+  </div>`;
+}
+
+// ── Inline event helpers (called from HTML attributes) ────
+window.openPedido = openPedido;
+window.refreshAll = refreshAll;
+window.confirmarPedido = confirmarPedido;
+window.buscarCliente = buscarCliente;
+window.seleccionarCliente = seleccionarCliente;
+
+window.cambiarArticulo = function(idx, sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const l = S.pedido.lineas[idx];
+  l.articuloId = sel.value || null;
+  l.articuloNombre = opt.dataset.nombre || '';
+  l.precio = parseFloat(opt.dataset.precio) || 0;
+  // Update price input and total without full re-render
+  const row = sel.closest('.linea-row');
+  if (row) {
+    const inp = row.querySelector('input[type=number]:nth-of-type(2)');
+    if (inp) inp.value = fmt2(l.precio);
+    const lt = row.querySelector('.linea-total');
+    if (lt) lt.textContent = '= €' + fmt2(lineTotal(l));
+  }
+  updateFooter();
+};
+
+window.goBack = function() {
+  S.view = 'list';
+  S.chatIdx = null;
+  S.pedido = null;
+  render();
+};
+
+window.resetSession = async function() {
+  if (!confirm('¿Eliminar sesión de WhatsApp? Tendrás que escanear el QR de nuevo.')) return;
+  await del('/api/whatsapp/sesion');
+  await refreshAll();
+};
+
+window.updateFooter = function() {
+  const p = S.pedido;
+  if (!p) return;
+  const total = p.lineas.reduce((s,l) => s + lineTotal(l), 0);
+  const el = document.getElementById('total-row');
+  if (el) el.innerHTML = `Total: <strong>€${fmt2(total)}</strong>`;
+  // Update individual totals
+  p.lineas.forEach((l, i) => {
+    const el2 = document.getElementById('lt-' + i);
+    if (el2) el2.textContent = '= €' + fmt2(lineTotal(l));
+  });
+};
+
+// ── Boot ─────────────────────────────────────────────────
+refreshAll();
+// Auto-refresh status every 20s, full chats refresh every 60s
+let tick = 0;
+setInterval(async () => {
+  tick++;
+  await loadStatus();
+  if (tick % 3 === 0) await loadChats();
+  if (S.view === 'list') render();
+  else {
+    // Just update status bar in pedido view without replacing the form
+    const hdr = document.querySelector('.app-header');
+  }
+}, 20000);
+</script>
+</body>
+</html>

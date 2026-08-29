@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="theme-color" content="#0F172A"/>
+  <title>COMAR - Contabilidad</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    html,body,#root{height:100%;background:#0F172A;font-family:'DM Sans',sans-serif;color:#E2E8F0}
+    ::-webkit-scrollbar{display:none}
+    .inp{width:100%;background:#1E293B;border:1px solid #334155;border-radius:12px;padding:12px 14px;color:#E2E8F0;font-size:14px;outline:none}
+    .inp:focus{border-color:#3B82F6}
+    .lbl{font-size:11px;font-weight:600;color:#64748B;letter-spacing:.08em;display:block;margin-bottom:6px}
+    .fld{margin-bottom:14px}
+    .btnP{background:linear-gradient(135deg,#3B82F6,#6366F1);border:none;border-radius:14px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;padding:14px;width:100%}
+    .card{background:#1E293B;border-radius:16px;border:1px solid #334155;padding:16px;margin-bottom:12px}
+    .mono{font-family:'DM Mono',monospace}
+    .debe{color:#EF4444}
+    .haber{color:#10B981}
+    @keyframes toastIn{from{transform:translateY(80px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);color:#fff;padding:10px 22px;border-radius:30px;font-size:13px;font-weight:600;z-index:999;animation:toastIn .3s ease;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+    @media print{.no-print{display:none!important}body,#root{background:#fff!important;color:#000!important}}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var h=React.createElement,useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
+var DB_API='/api.php';
+var SK_AUTH='entregas_auth';
+var SK_CONT='contabilidad_data';
+var SK_CONT_CONF='contabilidad_conf';
+var DEFAULT_SUBCUENTAS={
+  '570':'5700000001',
+  '572':'5720000001',
+  '700':'7000000001',
+  '705':'7050000001',
+  '477':'4770000021',
+  '472':'4720000021',
+  '475':'4750000021',
+  '470':'4700000021',
+  '430':'4300000000',
+  '621':'6210000001',
+  '622':'6220000001',
+  '623':'6230000001',
+  '624':'6240000001',
+  '625':'6250000001',
+  '626':'6260000001',
+  '627':'6270000001',
+  '628':'6280000001',
+  '629':'6290000001',
+  '630':'6300000001',
+  '631':'6310000001',
+  '640':'6400000001',
+  '642':'6420000001',
+  '521':'5210000001',
+  '400':'4000000001',
+  '410':'4100000001',
+  '440':'4400000001',
+  '600':'6000000001',
+  '129':'1290000001',
+  '100':'1000000001',
+};
+
+var DEFAULT_USER='paco',DEFAULT_PASS='entregas2024';
+
+function eur(n){return (parseFloat(n)||0).toFixed(2).replace('.',',')+'  EUR';}
+function gid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function fmtFecha(f){if(!f)return '';try{return new Date(f).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});}catch(e){return f;}}
+
+// ===== PLAN GENERAL CONTABLE =====
+var PGC = {
+  '100':'Capital social',
+  '112':'Reserva legal',
+  '129':'Resultado del ejercicio',
+  '170':'Deudas LP con entidades de credito',
+  '400':'Proveedores',
+  '410':'Acreedores por prestaciones de servicios',
+  '430':'Clientes',
+  '440':'Deudores varios',
+  '460':'Anticipos de remuneraciones',
+  '470':'Hacienda Publica deudora',
+  '471':'Organismos SS deudores',
+  '472':'HP IVA soportado',
+  '473':'HP retenciones y pagos a cuenta',
+  '475':'HP acreedora IVA',
+  '476':'Organismos SS acreedores',
+  '477':'HP IVA repercutido',
+  '480':'Gastos anticipados',
+  '521':'Deudas CP entidades credito',
+  '551':'Cuenta corriente con socios',
+  '560':'Fianzas recibidas CP',
+  '570':'Caja euros',
+  '572':'Bancos e instituciones de credito',
+  '600':'Compras de mercancias',
+  '601':'Compras materias primas',
+  '610':'Variacion existencias',
+  '620':'Gastos en I+D',
+  '621':'Arrendamientos y canones',
+  '622':'Reparaciones y conservacion',
+  '623':'Servicios de profesionales independientes',
+  '624':'Transportes',
+  '625':'Primas de seguros',
+  '626':'Servicios bancarios y similares',
+  '627':'Publicidad propaganda y relaciones publicas',
+  '628':'Suministros',
+  '629':'Otros servicios',
+  '630':'Impuesto sobre beneficios',
+  '631':'Otros tributos',
+  '640':'Sueldos y salarios',
+  '642':'Seguridad social a cargo empresa',
+  '650':'Perdidas de creditos comerciales',
+  '662':'Intereses de deudas',
+  '665':'Descuentos sobre ventas por PPT',
+  '700':'Ventas de mercancias',
+  '705':'Prestaciones de servicios',
+  '708':'Devoluciones de ventas',
+  '740':'Subvenciones a la explotacion',
+  '752':'Ingresos por arrendamientos',
+  '769':'Otros ingresos financieros'
+};
+
+// Categorias que llevan IVA y su tipo por defecto
+var CATS_IVA = {
+  'Ventas contado': {lleva:true, tipo:'repercutido', pct:21},
+  'Cobro cliente': {lleva:true, tipo:'repercutido', pct:21},
+  'Compra proveedor': {lleva:true, tipo:'soportado', pct:21},
+  'Arrendamiento': {lleva:true, tipo:'soportado', pct:21},
+  'Telecomunicaciones': {lleva:true, tipo:'soportado', pct:21},
+  'Suministros': {lleva:true, tipo:'soportado', pct:21},
+  'Servicios profesionales': {lleva:true, tipo:'soportado', pct:21},
+  'Publicidad': {lleva:true, tipo:'soportado', pct:21},
+  'Reparaciones': {lleva:true, tipo:'soportado', pct:21},
+  'Prestacion servicios': {lleva:true, tipo:'repercutido', pct:21},
+  'Otro ingreso': {lleva:true, tipo:'repercutido', pct:21},
+  // Sin IVA
+  'Seguridad Social autonomo': {lleva:false},
+  'Amortizacion prestamo': {lleva:false},
+  'Impuestos y tributos': {lleva:false},
+  'Nominas': {lleva:false},
+  'Gastos tarjeta': {lleva:false},
+  'Seguros': {lleva:false},
+  'Servicios bancarios': {lleva:false},
+  'Traspaso interno': {lleva:false},
+  'Gasto manual': {lleva:false},
+  'Combustible': {lleva:true, tipo:'soportado', pct:21},
+};
+
+function calcIVA(base, pct){
+  return Math.round(parseFloat(base)*pct/100*100)/100;
+}
+
+// Genera asientos con IVA desglosado
+function generarAsientosConIVA(asiento){
+  var cat = asiento.cat || '';
+  var ivaInfo = CATS_IVA[cat];
+  if(!ivaInfo || !ivaInfo.lleva || asiento.sinIVA) return [asiento];
+  
+  var base = Math.round(asiento.importe / (1 + ivaInfo.pct/100) * 100) / 100;
+  var iva = Math.round((asiento.importe - base) * 100) / 100;
+  
+  if(ivaInfo.tipo === 'repercutido'){
+    // Venta: 570/472 D, 700 H, 477 H
+    return [
+      Object.assign({}, asiento, {importe: asiento.importe, debe: asiento.debe, haber: asiento.haber, concepto: asiento.concepto}),
+      {id: asiento.id+'_iva', fecha: asiento.fecha, concepto: 'IVA repercutido - '+asiento.concepto, importe: iva, debe: asiento.debe, haber: '477', cat: 'IVA repercutido', tipo: 'iva_rep', origen: asiento.origen, confirmado: asiento.confirmado, esIVA: true},
+    ];
+  } else {
+    // Gasto: 629 D + 472 D, 572 H
+    return [
+      Object.assign({}, asiento, {importe: base}),
+      {id: asiento.id+'_iva', fecha: asiento.fecha, concepto: 'IVA soportado - '+asiento.concepto, importe: iva, debe: '472', haber: asiento.haber, cat: 'IVA soportado', tipo: 'iva_sop', origen: asiento.origen, confirmado: asiento.confirmado, esIVA: true},
+    ];
+  }
+}
+
+// ===== CLASIFICACION AUTOMATICA BBVA =====
+var REGLAS_BBVA = [
+  // INGRESOS
+  {cod:'00009',patron:'INGRESO EN EFECTIVO',debe:'570',haber:'700',tipo:'ingreso',cat:'Ventas contado'},
+  {cod:'00009',patron:'VENTAS DE CONTADO',debe:'570',haber:'700',tipo:'ingreso',cat:'Ventas contado'},
+  {cod:'00007',patron:'TRANSFERENCIAS',debe:'572',haber:'430',tipo:'ingreso',cat:'Cobro cliente',checkBenef:true},
+  // GASTOS FIJOS
+  {cod:'00379',patron:'AMORTIZACION DE PRESTAMO',debe:'521',haber:'572',tipo:'gasto',cat:'Amortizacion prestamo'},
+  {cod:'00326',patron:'PAGO DE IMPUESTOS',debe:'631',haber:'572',tipo:'gasto',cat:'Impuestos y tributos'},
+  {cod:'00326',patron:'TRIBUTOS',debe:'631',haber:'572',tipo:'gasto',cat:'Impuestos y tributos'},
+  {cod:'00120',patron:'ADEUDO MENSUAL DE TARJETA',debe:'629',haber:'572',tipo:'gasto',cat:'Gastos tarjeta'},
+  {cod:'00734',patron:'ALQUILER',debe:'621',haber:'572',tipo:'gasto',cat:'Arrendamiento'},
+  {cod:'00321',patron:'SEGURIDAD SOCIAL',debe:'642',haber:'572',tipo:'gasto',cat:'Seguridad Social autonomo'},
+  {cod:'00925',patron:'TELECOMUNICACIONES',debe:'629',haber:'572',tipo:'gasto',cat:'Telecomunicaciones'},
+  {cod:'00925',patron:'INTERNET',debe:'629',haber:'572',tipo:'gasto',cat:'Telecomunicaciones'},
+  {cod:'00129',patron:'ELECTRICIDAD',debe:'628',haber:'572',tipo:'gasto',cat:'Suministros'},
+  {cod:'00469',patron:'SEGUROS',debe:'625',haber:'572',tipo:'gasto',cat:'Seguros'},
+  {cod:'00022',patron:'TRASPASO',debe:'572',haber:'572',tipo:'traspaso',cat:'Traspaso interno'},
+  {cod:'00039',patron:'LIQUIDACION REMESAS',debe:'626',haber:'572',tipo:'gasto',cat:'Servicios bancarios'},
+  {cod:'00007',patron:'PROVEEDOR',debe:'600',haber:'572',tipo:'gasto',cat:'Compra proveedor'},
+  {cod:'00007',patron:'PAGO',debe:'400',haber:'572',tipo:'gasto',cat:'Pago proveedor'},
+];
+
+function clasificarMovimiento(mov){
+  var txt=(mov.concepto||'').toUpperCase();
+  var cod=(mov.codigo||'').trim();
+  var esGasto=(mov.tipo_orig==='gasto')||cod==='00120'||cod==='00379'||cod==='00326'||cod==='00321'||cod==='00734'||cod==='00925'||cod==='00129'||cod==='00469'||cod==='00039'||cod==='00022';
+
+  // Ingresos en efectivo: ya contabilizados como venta desde Caja
+  // En el BBVA solo reflejamos el traspaso de caja al banco: 572 D / 570 H
+  if(cod==='00009') return {debe:'572',haber:'570',cat:'Ingreso efectivo - traspaso caja banco',tipo:'traspaso'};
+  if(cod==='00007'&&!esGasto) return {debe:'572',haber:'430',cat:'Cobro cliente',tipo:'ingreso'};
+
+  // Gastos por codigo
+  if(cod==='00379') return {debe:'521',haber:'572',cat:'Amortizacion prestamo',tipo:'gasto'};
+  if(cod==='00326') return {debe:'631',haber:'572',cat:'Impuestos y tributos',tipo:'gasto'};
+  if(cod==='00321') return {debe:'642',haber:'572',cat:'Seguridad Social autonomo',tipo:'gasto'};
+  if(cod==='00120') return {debe:'629',haber:'572',cat:'Gastos tarjeta',tipo:'gasto'};
+  if(cod==='00039') return {debe:'626',haber:'572',cat:'Servicios bancarios',tipo:'gasto'};
+  if(cod==='00022') return {debe:'572',haber:'572',cat:'Traspaso interno',tipo:'traspaso'};
+
+  // Gastos por concepto cuando el codigo no es definitivo
+  if(txt.indexOf('ALQUILER')>=0||cod==='00734') return {debe:'621',haber:'572',cat:'Arrendamiento',tipo:'gasto'};
+  if(txt.indexOf('ELECTRICIDAD')>=0||txt.indexOf('REPSOL')>=0||cod==='00129') return {debe:'628',haber:'572',cat:'Suministros',tipo:'gasto'};
+  if(txt.indexOf('SEGURO')>=0||txt.indexOf('ADESLAS')>=0||txt.indexOf('MAPFRE')>=0||cod==='00469') return {debe:'625',haber:'572',cat:'Seguros',tipo:'gasto'};
+  if(txt.indexOf('TELECOMUNICACION')>=0||txt.indexOf('MOVISTAR')>=0||txt.indexOf('VODAFONE')>=0||txt.indexOf('ORANGE')>=0||cod==='00925') return {debe:'629',haber:'572',cat:'Telecomunicaciones',tipo:'gasto'};
+  if(txt.indexOf('ADEUDO MENSUAL DE TARJETA')>=0||txt.indexOf('TARJETA')>=0) return {debe:'629',haber:'572',cat:'Gastos tarjeta',tipo:'gasto'};
+
+  // Fallback
+  if(esGasto) return {debe:'629',haber:'572',cat:'Otros gastos',tipo:'gasto'};
+  return {debe:'572',haber:'700',cat:'Otros ingresos',tipo:'ingreso'};
+}
+
+function generarAsientosBanco(mov, clas){
+  var importe=Math.abs(parseFloat(mov.importe)||0);
+  if(!importe) return [];
+
+  var base={
+    id:mov.id,
+    fecha:mov.fecha,
+    concepto:mov.concepto,
+    importe:importe,
+    debe:clas.debe,
+    haber:clas.haber,
+    cat:clas.cat,
+    tipo:clas.tipo,
+    origen:'banco',
+    confirmado:false
+  };
+
+  // Ventas en efectivo: desglosar IVA 21%
+  // 570 Caja -> 700 Ventas (base) + 477 IVA repercutido
+  if(clas.tipo==='ingreso'&&clas.debe==='570'){
+    var base21=Math.round(importe/1.21*100)/100;
+    var iva21=Math.round((importe-base21)*100)/100;
+    return [
+      {id:mov.id,fecha:mov.fecha,concepto:mov.concepto,importe:base21,debe:'570',haber:'700',cat:'Ventas contado',tipo:'ingreso',origen:'banco',confirmado:false},
+      {id:mov.id+'_iva',fecha:mov.fecha,concepto:'IVA 21% - '+mov.concepto,importe:iva21,debe:'570',haber:'477',cat:'IVA repercutido',tipo:'iva_rep',origen:'banco',confirmado:false,esIVA:true}
+    ];
+  }
+
+  // Gastos con IVA desglosado
+  var catsConIVA=['Arrendamiento','Suministros','Telecomunicaciones','Servicios profesionales','Publicidad','Compra proveedor','Combustible','Gastos tarjeta'];
+  if(clas.tipo==='gasto'&&catsConIVA.indexOf(clas.cat)>=0){
+    var baseG=Math.round(importe/1.21*100)/100;
+    var ivaG=Math.round((importe-baseG)*100)/100;
+    return [
+      {id:mov.id,fecha:mov.fecha,concepto:mov.concepto,importe:baseG,debe:clas.debe,haber:clas.haber,cat:clas.cat,tipo:'gasto',origen:'banco',confirmado:false},
+      {id:mov.id+'_iva',fecha:mov.fecha,concepto:'IVA 21% - '+mov.concepto,importe:ivaG,debe:'472',haber:clas.haber,cat:'IVA soportado',tipo:'iva_sop',origen:'banco',confirmado:false,esIVA:true}
+    ];
+  }
+
+  return [base];
+}
+
+function esGasto(importe,clas){
+  return clas.tipo==='gasto';
+}
+
+// ===== PDF EXTRACTOR =====
+function extractPDFText(file){
+  return new Promise(function(resolve,reject){
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var arr=new Uint8Array(ev.target.result);
+      pdfjsLib.getDocument({data:arr}).promise.then(function(pdf){
+        var pages=[];
+        for(var i=1;i<=pdf.numPages;i++) pages.push(i);
+        return Promise.all(pages.map(function(pn){
+          return pdf.getPage(pn).then(function(page){
+            return page.getTextContent().then(function(tc){
+              return tc.items.map(function(item){return item.str;}).join(' ');
+            });
+          });
+        }));
+      }).then(function(texts){resolve(texts.join('\n'));}).catch(reject);
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Patron de cada tipo de movimiento a buscar en el texto del PDF
+var PATRONES_BBVA=[
+  {patron:'INGRESO EN EFECTIVO',codigo:'00009',tipo:'ingreso'},
+  {patron:'VENTAS DE CONTADO',codigo:'00009',tipo:'ingreso'},
+  {patron:'TRANSFERENCIA RECIBIDA',codigo:'00007',tipo:'ingreso'},
+  {patron:'ABONO TRANSFERENCIA',codigo:'00007',tipo:'ingreso'},
+  {patron:'AMORTIZACION DE PRESTAMO',codigo:'00379',tipo:'gasto'},
+  {patron:'AMORTIZACION PRESTAMO',codigo:'00379',tipo:'gasto'},
+  {patron:'PAGO DE IMPUESTOS',codigo:'00326',tipo:'gasto'},
+  {patron:'PAGO IMPUESTO',codigo:'00326',tipo:'gasto'},
+  {patron:'ADEUDO MENSUAL DE TARJETA',codigo:'00120',tipo:'gasto'},
+  {patron:'ADEUDO TARJETA',codigo:'00120',tipo:'gasto'},
+  {patron:'ALQUILER',codigo:'00734',tipo:'gasto'},
+  {patron:'SEGURIDAD SOCIAL',codigo:'00321',tipo:'gasto'},
+  {patron:'CUOTA AUTONOMO',codigo:'00321',tipo:'gasto'},
+  {patron:'TELECOMUNICACIONES',codigo:'00925',tipo:'gasto'},
+  {patron:'MOVISTAR',codigo:'00925',tipo:'gasto'},
+  {patron:'VODAFONE',codigo:'00925',tipo:'gasto'},
+  {patron:'ORANGE',codigo:'00925',tipo:'gasto'},
+  {patron:'ELECTRICIDAD',codigo:'00129',tipo:'gasto'},
+  {patron:'ENDESA',codigo:'00129',tipo:'gasto'},
+  {patron:'IBERDROLA',codigo:'00129',tipo:'gasto'},
+  {patron:'SEGURO',codigo:'00469',tipo:'gasto'},
+  {patron:'TRASPASO',codigo:'00022',tipo:'traspaso'},
+  {patron:'LIQUIDACION REMESAS',codigo:'00039',tipo:'gasto'},
+  {patron:'COMISION',codigo:'00039',tipo:'gasto'},
+];
+
+function parseBBVA(text){
+  var movs=[];
+  var upperText=text.toUpperCase();
+
+  PATRONES_BBVA.forEach(function(pat){
+    var search=pat.patron;
+    var idx=0;
+    while((idx=upperText.indexOf(search,idx))!==-1){
+      var before=text.substring(Math.max(0,idx-400),idx);
+      var after=text.substring(idx,idx+600);
+      var dates=before.match(/\d{2}\/\d{2}\/\d{4}/g);
+      if(!dates||!dates.length){idx+=search.length;continue;}
+      var fecha=dates[dates.length-1];
+
+      // Buscar importe negativo en concepto (cargos): formato "-43,4 EU" o "-124,60 EUR"
+      var negReg=/-(\d{1,3}(?:\.\d{3})*,\d{1,2})\s*EU/g;
+      var negMatches=[],nm;
+      negReg.lastIndex=0;
+      while((nm=negReg.exec(after))!==null){
+        var val=parseFloat(nm[1].replace(/\./g,'').replace(',','.'));
+        if(val>=0.01&&val<=99999) negMatches.push(val);
+      }
+
+      // Buscar importe positivo (abonos): ignorar saldos grandes >9999
+      var posReg=/\+?(\d{1,3}(?:\.\d{3})*,\d{2})\s*EU/g;
+      var posMatches=[],pm2;
+      posReg.lastIndex=0;
+      while((pm2=posReg.exec(after))!==null){
+        var pval=parseFloat(pm2[1].replace(/\./g,'').replace(',','.'));
+        if(pval>=0.01&&pval<=9999) posMatches.push(pval);
+      }
+
+      var importe=0;
+      if(pat.tipo==='gasto'&&negMatches.length>0) importe=negMatches[0];
+      else if(pat.tipo==='ingreso'&&posMatches.length>0) importe=posMatches[0];
+      else if(negMatches.length>0) importe=negMatches[0];
+      else if(posMatches.length>0) importe=posMatches[0];
+
+      if(!importe||importe<0.01){idx+=search.length;continue;}
+
+      var dup=movs.find(function(mv){
+        return mv.fecha===fecha&&Math.abs(mv.importe-importe)<0.01&&mv.codigo===pat.codigo;
+      });
+      if(!dup){
+        var concepto=after.slice(0,120).replace(/[\r\n]+/g,' ').trim().slice(0,80);
+        if(!concepto) concepto=pat.patron;
+        movs.push({id:gid(),fecha:fecha,codigo:pat.codigo,concepto:concepto,importe:importe,tipo_orig:pat.tipo,confirmado:false});
+      }
+      idx+=search.length;
+    }
+  });
+
+  movs.sort(function(a,b){
+    return a.fecha.split('/').reverse().join('').localeCompare(b.fecha.split('/').reverse().join(''));
+  });
+  return movs;
+}
+
+// ===== CSV BBVA PARSER =====
+function parseCSVLine(line){
+  var cols=[],cur='',inQ=false;
+  for(var i=0;i<line.length;i++){
+    var ch=line[i];
+    if(ch==='"'){inQ=!inQ;}
+    else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}
+    else{cur+=ch;}
+  }
+  cols.push(cur.trim());
+  return cols;
+}
+
+function parseCSVBBVA(text){
+  var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
+  if(lines.length<2) return [];
+  var headers=parseCSVLine(lines[0]).map(function(h){return h.toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').trim();});
+  var iF=headers.findIndex(function(h){return /fecha/.test(h)&&!/valor/.test(h);});
+  var iC=headers.findIndex(function(h){return h==='codigo'||h==='code';});
+  var iCon=headers.findIndex(function(h){return h==='concepto';});
+  var iObs=headers.findIndex(function(h){return h==='observaciones';});
+  var iImp=headers.findIndex(function(h){return h==='importe';});
+  if(iF<0||iImp<0) return [];
+  var movs=[];
+  for(var i=1;i<lines.length;i++){
+    var cols=parseCSVLine(lines[i]);
+    if(cols.length<=iImp) continue;
+    var fechaStr=cols[iF]||'';
+    var fm=fechaStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!fm) continue;
+    var importe=parseFloat(cols[iImp]);
+    if(isNaN(importe)) continue;
+    var codigo=iC>=0?(cols[iC]||''):'';
+    var concepto=iCon>=0?(cols[iCon]||''):'';
+    var obs=iObs>=0?(cols[iObs]||''):'';
+    var conceptoClasif=(concepto+' '+obs).toUpperCase();
+    movs.push({id:gid(),fecha:fechaStr,codigo:codigo,concepto:conceptoClasif,benef:obs||concepto,importe:importe});
+  }
+  return movs;
+}
+
+// ===== LOGIN =====
+function Login(props){
+  var su=useState('');var u=su[0],setU=su[1];
+  var sp=useState('');var p=sp[0],setP=sp[1];
+  var se=useState('');var err=se[0],setErr=se[1];
+  function login(){
+    var creds=JSON.parse(localStorage.getItem(SK_AUTH)||'null')||{user:DEFAULT_USER,pass:DEFAULT_PASS};
+    if(u===creds.user&&p===creds.pass) props.onLogin();
+    else setErr('Usuario o contrasena incorrectos');
+  }
+  return h('div',{style:{minHeight:'100dvh',background:'#0F172A',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24}},
+    h('div',{style:{fontSize:14,fontWeight:700,color:'#3B82F6',letterSpacing:3,marginBottom:8}},'COMAR'),
+    h('div',{style:{fontSize:22,fontWeight:700,color:'#F1F5F9',marginBottom:4}},'Contabilidad'),
+    h('div',{style:{fontSize:12,color:'#64748B',marginBottom:32}},'Libro diario y gestion contable'),
+    h('div',{style:{width:'100%',maxWidth:360}},
+      h('div',{className:'fld'},h('span',{className:'lbl'},'USUARIO'),h('input',{value:u,onChange:function(e){setU(e.target.value);},className:'inp',onKeyDown:function(e){if(e.key==='Enter')login();}})),
+      h('div',{className:'fld'},h('span',{className:'lbl'},'CONTRASENA'),h('input',{type:'password',value:p,onChange:function(e){setP(e.target.value);},className:'inp',onKeyDown:function(e){if(e.key==='Enter')login();}})),
+      err&&h('div',{style:{fontSize:13,color:'#EF4444',marginBottom:12,textAlign:'center'}},err),
+      h('button',{className:'btnP',onClick:login},'Entrar')
+    )
+  );
+}
+
+// ===== MAIN APP =====
+function App(){
+  var sl=useState(function(){return localStorage.getItem('cont_logged')==='1';});
+  var logged=sl[0],setLogged=sl[1];
+  var sv=useState('diario');var vista=sv[0],setVista=sv[1];
+  var sa=useState([]);var asientos=sa[0],setAsientos=sa[1];
+  var sm=useState(String(new Date().getMonth()+1).padStart(2,'0'));var mes=sm[0],setMes=sm[1];
+  var san=useState(String(new Date().getFullYear()));var anio=san[0],setAnio=san[1];
+  var sload=useState(false);var loading=sload[0],setLoading=sload[1];
+  var stoast=useState(null);var toast=stoast[0],setToast=stoast[1];
+  var sedit=useState(null);var editAsiento=sedit[0],setEditAsiento=sedit[1];
+  var sgasto=useState(false);var showGasto=sgasto[0],setShowGasto=sgasto[1];
+  var sgf=useState({fecha:'',concepto:'',importe:'',debe:'629',haber:'572',cat:'Gasto manual'});
+  var gastoForm=sgf[0],setGastoForm=sgf[1];
+  var tRef=useRef(null);
+
+  function msg(m,t){setToast({m:m,t:t||'ok'});clearTimeout(tRef.current);tRef.current=setTimeout(function(){setToast(null);},3000);}
+  var scs=React.useState(function(){try{return Object.assign({},DEFAULT_SUBCUENTAS,JSON.parse(localStorage.getItem(SK_CONT_CONF)||'{}'));}catch(e){return DEFAULT_SUBCUENTAS;}});
+  var confSub=scs[0],setConfSub=scs[1];
+  function saveConfSub(c){setConfSub(c);localStorage.setItem(SK_CONT_CONF,JSON.stringify(c));}
+  function getSubcuenta(cuenta){return (confSub[cuenta]||DEFAULT_SUBCUENTAS[cuenta]||cuenta+'0000000000').slice(0,10);}
+  function saveAsientos(list){setAsientos(list);localStorage.setItem(SK_CONT,JSON.stringify(list));}
+
+  useEffect(function(){
+    if(!logged) return;
+    var saved=localStorage.getItem(SK_CONT);
+    if(saved){try{setAsientos(JSON.parse(saved));}catch(e){}}
+  },[logged]);
+
+  if(!logged) return h(Login,{onLogin:function(){localStorage.setItem('cont_logged','1');setLogged(true);}});
+
+  var MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var mesNum=parseInt(mes)||1,anioNum=parseInt(anio)||2026;
+
+  // Filtrar asientos del periodo
+  var asientosFiltrados=asientos.filter(function(a){
+    if(!a.fecha) return false;
+    var parts=a.fecha.split('/');
+    if(parts.length===3){
+      return parseInt(parts[1])===mesNum&&parseInt(parts[2])===anioNum;
+    }
+    return false;
+  }).sort(function(a,b){
+    var da=a.fecha.split('/').reverse().join('');
+    var db=b.fecha.split('/').reverse().join('');
+    return da.localeCompare(db);
+  });
+
+  // Calculos balance
+  var totalIngresos=asientosFiltrados.filter(function(a){return a.tipo==='ingreso';}).reduce(function(s,a){return s+Math.abs(parseFloat(a.importe)||0);},0);
+  var totalGastos=asientosFiltrados.filter(function(a){return a.tipo==='gasto';}).reduce(function(s,a){return s+Math.abs(parseFloat(a.importe)||0);},0);
+  var resultado=totalIngresos-totalGastos;
+
+  // IVA del periodo
+  var ivaRepercutido=asientosFiltrados.filter(function(a){return a.cat==='IVA repercutido';}).reduce(function(s,a){return s+Math.abs(parseFloat(a.importe)||0);},0);
+  var ivaSoportado=asientosFiltrados.filter(function(a){return a.cat==='IVA soportado';}).reduce(function(s,a){return s+Math.abs(parseFloat(a.importe)||0);},0);
+  var ivaLiquidar=ivaRepercutido-ivaSoportado;
+  var trimestre=Math.ceil(mesNum/3);
+
+  // Agrupar por cuenta para balance
+  var cuentas={};
+  asientosFiltrados.forEach(function(a){
+    if(!cuentas[a.debe]) cuentas[a.debe]={cuenta:a.debe,debe:0,haber:0};
+    if(!cuentas[a.haber]) cuentas[a.haber]={cuenta:a.haber,debe:0,haber:0};
+    cuentas[a.debe].debe+=Math.abs(parseFloat(a.importe)||0);
+    cuentas[a.haber].haber+=Math.abs(parseFloat(a.importe)||0);
+  });
+
+  function procesarPDF(file){
+    setLoading(true);
+    extractPDFText(file).then(function(text){
+      var movs=parseBBVA(text);
+      if(!movs.length){msg('No se encontraron movimientos en el PDF','err');setLoading(false);return;}
+      var nuevosAsientos=movs.map(function(mov){
+        var clas=clasificarMovimiento(mov);
+        return {
+          id:mov.id,
+          fecha:mov.fecha,
+          concepto:mov.concepto,
+          importe:Math.abs(mov.importe),
+          debe:clas.debe,
+          haber:clas.haber,
+          cat:clas.cat,
+          tipo:clas.tipo,
+          origen:'banco',
+          confirmado:false
+        };
+      });
+      saveAsientos(asientos.concat(nuevosAsientos));
+      msg(nuevosAsientos.length+' asientos importados del banco');
+      setLoading(false);
+      setVista('diario');
+    }).catch(function(e){msg('Error al leer PDF','err');setLoading(false);});
+  }
+
+  function procesarCSV(file){
+    setLoading(true);
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        var movs=parseCSVBBVA(ev.target.result);
+        if(!movs.length){msg('No se encontraron movimientos en el CSV','err');setLoading(false);return;}
+        var keys={};
+        asientos.forEach(function(a){keys[a.fecha+'|'+Math.abs(parseFloat(a.importe)||0)]=true;});
+        var nuevosMovs=movs.filter(function(mv){return !keys[mv.fecha+'|'+Math.abs(parseFloat(mv.importe)||0)];});
+        var nuevosAsientos=[];
+        nuevosMovs.forEach(function(mov){
+          var clas=clasificarMovimiento(mov);
+          var lista=generarAsientosBanco(mov,clas);
+          nuevosAsientos=nuevosAsientos.concat(lista);
+        });
+        saveAsientos(asientos.concat(nuevosAsientos));
+        msg(nuevosMovs.length+' movimientos importados ('+nuevosAsientos.length+' asientos)');
+        setLoading(false);
+        setVista('diario');
+      }catch(e){msg('Error al leer el CSV: '+e.message,'err');setLoading(false);}
+    };
+    reader.onerror=function(){msg('Error al leer el CSV','err');setLoading(false);};
+    reader.readAsText(file,'UTF-8');
+  }
+
+  function guardarGasto(){
+    if(!gastoForm.fecha||!gastoForm.concepto||!gastoForm.importe){msg('Rellena todos los campos','err');return;}
+    var base={
+      id:gid(),
+      fecha:gastoForm.fecha.split('-').reverse().join('/'),
+      concepto:gastoForm.concepto,
+      importe:Math.abs(parseFloat(gastoForm.importe)||0),
+      debe:gastoForm.debe,
+      haber:gastoForm.haber,
+      cat:gastoForm.cat,
+      tipo:parseFloat(gastoForm.importe)>0?'gasto':'ingreso',
+      origen:'manual',
+      confirmado:false,
+      sinIVA:!gastoForm.conIVA
+    };
+    var nuevos=gastoForm.conIVA?generarAsientosConIVA(base):[base];
+    saveAsientos(asientos.concat(nuevos));
+    setShowGasto(false);
+    setGastoForm({fecha:'',concepto:'',importe:'',debe:'629',haber:'572',cat:'Gasto manual'});
+    msg('Asiento guardado');
+  }
+
+  // Exportar formato Contaplus xDiario.txt + xSubCta.txt
+  // Estructura correcta: un asiento = varias lineas debe/haber bajo el mismo numero
+  function exportarContaplus(){
+    if(!asientosFiltrados.length){msg('No hay asientos en este periodo','err');return;}
+
+    // Agrupar por id base (factura base + sus lineas de IVA)
+    var grupos={};
+    var ordenGrupos=[];
+    asientosFiltrados.forEach(function(a){
+      var idBase=a.id.replace(/_iva\d*$/,'').replace(/_liq.*$/,'').replace(/_iva$/,'');
+      if(!grupos[idBase]){grupos[idBase]=[];ordenGrupos.push(idBase);}
+      grupos[idBase].push(a);
+    });
+
+    var lineasDiario=[];
+    var subcuentasUsadas={};
+    var numAsiento=(confSub._ultimoAsiento||0)+1;
+
+    function padImp(n,len){
+      var cents=Math.round(Math.abs(parseFloat(n)||0)*100);
+      return String(cents).padStart(len,' ');
+    }
+    function fmtSub(cod){
+      return cod?getSubcuenta(cod).padEnd(12,' '):'            ';
+    }
+    function fmtConc(s){
+      return (s||'').replace(/[^\x20-\x7E]/g,'').slice(0,25).padEnd(25,' ');
+    }
+    function fmtFecCP(f){
+      var p=f.split('/');
+      return (p[2]||'2026')+(p[1]||'01').padStart(2,'0')+(p[0]||'01').padStart(2,'0');
+    }
+    function linea(num,f,debe,haber,imp,conc,base,esIVA){
+      var nStr=String(num).padStart(6,'0');
+      var debeStr=debe?getSubcuenta(debe).slice(0,10):'          ';
+      var haberStr=haber?getSubcuenta(haber).slice(0,10):'          ';
+      var cents=Math.round(Math.abs(parseFloat(imp)||0)*100);
+      var impStr=String(cents).padStart(15,' ');
+      var concStr=(conc||'').replace(/[^\x20-\x7E]/g,'').slice(0,38).padEnd(38,' ');
+      var ivaStr=esIVA?' 2100':'    0';
+      var tail='0                       0'+ivaStr+'    0             ';
+      return nStr+fmtFecCP(f)+debeStr+'  '+haberStr+impStr+concStr+tail;
+    }
+    function regSub(cod,nom){
+      if(!cod)return;
+      var sub=getSubcuenta(cod);
+      if(!subcuentasUsadas[sub])subcuentasUsadas[sub]={cod:sub,nom:nom||PGC[cod]||'Cuenta '+cod};
+    }
+
+    ordenGrupos.forEach(function(idBase){
+      var grupo=grupos[idBase];
+      if(!grupo||!grupo.length)return;
+      var linIVARep=grupo.filter(function(a){return a.cat==='IVA repercutido';});
+      var linIVASop=grupo.filter(function(a){return a.cat==='IVA soportado';});
+      var linBase=grupo.filter(function(a){return !a.esIVA&&a.cat!=='IVA repercutido'&&a.cat!=='IVA soportado';});
+      var fecha=grupo[0].fecha;
+      var conc=grupo[0].concepto;
+
+      if(linIVARep.length>0){
+        // VENTA con IVA: DEBE 570 total / HABER 700 base / HABER 477 cuota
+        var base=linBase.reduce(function(s,a){return s+Math.abs(parseFloat(a.importe)||0);},0);
+        var ivaR=linIVARep.reduce(function(s,a){return s+Math.abs(parseFloat(a.importe)||0);},0);
+        var total=base+ivaR;
+        var ctaVenta=linBase[0]?linBase[0].haber:'700';
+        lineasDiario.push(linea(numAsiento,fecha,'570',null,total,conc,null,false));
+        lineasDiario.push(linea(numAsiento,fecha,null,ctaVenta,base,conc,null,false));
+        lineasDiario.push(linea(numAsiento,fecha,null,'477',ivaR,conc,base,true));
+        regSub('570');regSub(ctaVenta);regSub('477');
+
+      } else if(linIVASop.length>0){
+        // GASTO con IVA: DEBE cta_gasto base / DEBE 472 iva / HABER 572 total
+        var baseG=linBase.reduce(function(s,a){return s+Math.abs(parseFloat(a.importe)||0);},0);
+        var ivaS=linIVASop.reduce(function(s,a){return s+Math.abs(parseFloat(a.importe)||0);},0);
+        var totalG=baseG+ivaS;
+        var ctaGasto=linBase[0]?linBase[0].debe:'629';
+        lineasDiario.push(linea(numAsiento,fecha,ctaGasto,null,baseG,conc,null,false));
+        lineasDiario.push(linea(numAsiento,fecha,'472',null,ivaS,conc,baseG,true));
+        lineasDiario.push(linea(numAsiento,fecha,null,'572',totalG,conc,null,false));
+        regSub(ctaGasto);regSub('472');regSub('572');
+
+      } else {
+        // APUNTE SIMPLE (traspaso, SS, prestamo...): DEBE / HABER
+        linBase.forEach(function(a){
+          var imp=Math.abs(parseFloat(a.importe)||0);
+          if(imp<=0)return;
+          if(a.debe)lineasDiario.push(linea(numAsiento,fecha,a.debe,null,imp,conc,null,false));
+          if(a.haber)lineasDiario.push(linea(numAsiento,fecha,null,a.haber,imp,conc,null,false));
+          regSub(a.debe);regSub(a.haber);
+        });
+      }
+      numAsiento++;
+    });
+
+    // xDiario.txt
+    var blobD=new Blob([lineasDiario.join('\r\n')],{type:'text/plain;charset=windows-1252'});
+    var urlD=URL.createObjectURL(blobD);
+    var aD=document.createElement('a');
+    aD.href=urlD;aD.download='xDiario.txt';aD.click();
+    URL.revokeObjectURL(urlD);
+
+    // xSubCta.txt
+    setTimeout(function(){
+      var linSub=Object.values(subcuentasUsadas).map(function(s){
+        return s.cod.padEnd(12,' ')+s.nom.replace(/[^\x20-\x7E]/g,'').slice(0,40).padEnd(40,' ');
+      });
+      var blobS=new Blob([linSub.join('\r\n')],{type:'text/plain;charset=windows-1252'});
+      var urlS=URL.createObjectURL(blobS);
+      var aS=document.createElement('a');
+      aS.href=urlS;aS.download='xSubCta.txt';aS.click();
+      URL.revokeObjectURL(urlS);
+      msg('Exportados xDiario.txt y xSubCta.txt para Contaplus Elite');
+      // Actualizar ultimo numero de asiento exportado
+      var nuevo=Object.assign({},confSub,{_ultimoAsiento:numAsiento-1});
+      saveConfSub(nuevo);
+    },500);
+  }
+
+  function exportarCSV(){
+    var rows=[['Fecha','Concepto','Categoria','Debe','Cuenta Debe','Haber','Cuenta Haber','Importe','Tipo','Origen']];
+    asientosFiltrados.forEach(function(a){
+      rows.push([a.fecha,'"'+a.concepto+'"',a.cat,a.debe,'"'+(PGC[a.debe]||'')+'"',a.haber,'"'+(PGC[a.haber]||'')+'"',a.importe,a.tipo,a.origen||'']);
+    });
+    var csv=rows.map(function(r){return r.join(';');}).join('\n');
+    var blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download='libro_diario_'+mes+'_'+anio+'.csv';a.click();
+    URL.revokeObjectURL(url);
+    msg('CSV exportado');
+  }
+
+  var TABS=['diario','balance','importar','gastos','config'];
+  var TABLABELS={diario:'Libro diario',balance:'Balance',importar:'Importar',gastos:'+ Asiento',config:'Config'};
+
+  return h('div',{style:{minHeight:'100dvh',background:'#0F172A',maxWidth:480,margin:'0 auto',display:'flex',flexDirection:'column'}},
+    toast&&h('div',{className:'toast no-print',style:{background:toast.t==='err'?'#EF4444':'#10B981'}},toast.m),
+
+    // Header
+    h('div',{className:'no-print',style:{background:'linear-gradient(135deg,#1E293B,#0F172A)',paddingTop:'max(54px,env(safe-area-inset-top,54px))',paddingBottom:14,paddingLeft:20,paddingRight:20,borderBottom:'1px solid #1E293B'}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},
+        h('div',null,
+          h('div',{style:{fontSize:11,fontWeight:600,letterSpacing:'.12em',color:'#64748B'}},'COMAR'),
+          h('div',{style:{fontSize:22,fontWeight:700,color:'#F1F5F9'}},'Contabilidad')
+        ),
+        h('div',{style:{display:'flex',gap:8}},
+          h('a',{href:'/',style:{background:'#1E293B',border:'1px solid #334155',color:'#94A3B8',padding:'7px 12px',borderRadius:10,fontSize:11,fontWeight:600,textDecoration:'none'}},'Entregas'),
+          h('button',{onClick:function(){localStorage.removeItem('cont_logged');setLogged(false);},style:{background:'transparent',border:'1px solid #EF4444',color:'#EF4444',padding:'7px 12px',borderRadius:10,fontSize:11,fontWeight:600,cursor:'pointer'}},'Salir')
+        )
+      ),
+      // Periodo
+      h('div',{style:{display:'flex',gap:8,marginBottom:10}},
+        h('select',{value:mes,onChange:function(e){setMes(e.target.value);},className:'inp',style:{flex:2,padding:'7px 10px'}},
+          ['01','02','03','04','05','06','07','08','09','10','11','12'].map(function(m){return h('option',{key:m,value:m},MESES[parseInt(m)-1]);})
+        ),
+        h('input',{type:'number',value:anio,onChange:function(e){setAnio(e.target.value);},className:'inp',style:{flex:1,padding:'7px 10px'},placeholder:'2026'})
+      ),
+      // Tabs
+      h('div',{style:{display:'flex',gap:6}},
+        TABS.map(function(v){
+          return h('button',{key:v,onClick:function(){setVista(v);},style:{flex:1,padding:'7px 2px',borderRadius:10,border:'none',cursor:'pointer',fontSize:10,fontWeight:600,background:vista===v?'#3B82F6':'#1E293B',color:vista===v?'#fff':'#64748B'}},TABLABELS[v]);
+        })
+      )
+    ),
+
+    // Content
+    h('div',{style:{flex:1,overflowY:'auto',padding:'16px 16px 50px'}},
+
+      // LIBRO DIARIO
+      vista==='diario'&&h('div',null,
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},
+          h('div',{style:{fontSize:13,fontWeight:600,color:'#94A3B8'}},asientosFiltrados.length+' asientos'),
+          h('div',{style:{display:'flex',gap:6}},
+            h('button',{onClick:exportarCSV,style:{background:'#1E293B',border:'1px solid #10B981',color:'#10B981',padding:'6px 12px',borderRadius:10,fontSize:11,fontWeight:600,cursor:'pointer'}},'CSV'),
+            h('button',{onClick:exportarContaplus,style:{background:'#1E293B',border:'1px solid #F59E0B',color:'#F59E0B',padding:'6px 12px',borderRadius:10,fontSize:11,fontWeight:600,cursor:'pointer'}},'Contaplus')
+          )
+        ),
+        asientosFiltrados.length===0&&h('div',{style:{textAlign:'center',color:'#475569',marginTop:40}},
+          h('div',{style:{fontSize:13}},'No hay asientos en '+MESES[mesNum-1]+' '+anioNum),
+          h('div',{style:{fontSize:11,marginTop:8,color:'#334155'}},'Total asientos guardados: '+asientos.length),
+          asientos.length>0&&h('div',{style:{fontSize:11,marginTop:4,color:'#334155'}},'Fechas disponibles: '+[...new Set(asientos.map(function(a){return a.fecha?a.fecha.slice(3):'?';}))].sort().join(', '))
+        ),
+        asientosFiltrados.map(function(a){
+          return h('div',{key:a.id,className:'card',style:{padding:'12px 14px',cursor:'pointer',border:'1px solid '+(a.confirmado?'#10B98133':'#334155')},onClick:function(){setEditAsiento(Object.assign({},a));}},
+            h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}},
+              h('div',null,
+                h('div',{style:{fontSize:12,color:'#64748B',marginBottom:2}},a.fecha+'  '+a.cat),
+                h('div',{style:{fontSize:13,fontWeight:600,color:'#F1F5F9'}},a.concepto)
+              ),
+              h('div',{style:{textAlign:'right'}},
+                h('div',{className:'mono',style:{fontSize:14,fontWeight:700,color:a.tipo==='ingreso'?'#10B981':'#EF4444'}},(a.tipo==='ingreso'?'+':'-')+eur(a.importe)),
+                a.confirmado&&h('div',{style:{fontSize:9,color:'#10B981',marginTop:2}},'CONFIRMADO')
+              )
+            ),
+            h('div',{style:{display:'flex',gap:8,fontSize:11}},
+              h('div',{style:{background:'#0F172A',borderRadius:6,padding:'3px 8px',color:'#EF4444',fontFamily:'monospace'}},a.debe+' D'),
+              h('div',{style:{background:'#0F172A',borderRadius:6,padding:'3px 8px',color:'#10B981',fontFamily:'monospace'}},a.haber+' H'),
+              h('div',{style:{color:'#475569',fontSize:10,paddingTop:3}},a.origen==='banco'?'Banco':'Manual')
+            )
+          );
+        })
+      ),
+
+      // BALANCE
+      vista==='balance'&&h('div',null,
+        h('div',{className:'card',style:{border:'1px solid #3B82F644',marginBottom:16}},
+          h('div',{style:{fontSize:12,fontWeight:600,color:'#64748B',marginBottom:12,letterSpacing:'.08em'}},('RESULTADO '+MESES[mesNum-1].toUpperCase()+' '+anioNum)),
+          h('div',{style:{display:'flex',gap:8,marginBottom:12}},
+            h('div',{style:{flex:1,background:'#0F172A',borderRadius:10,padding:'12px'}},
+              h('div',{style:{fontSize:10,color:'#64748B',marginBottom:4}},'INGRESOS'),
+              h('div',{className:'mono',style:{fontSize:18,fontWeight:700,color:'#10B981'}},eur(totalIngresos))
+            ),
+            h('div',{style:{flex:1,background:'#0F172A',borderRadius:10,padding:'12px'}},
+              h('div',{style:{fontSize:10,color:'#64748B',marginBottom:4}},'GASTOS'),
+              h('div',{className:'mono',style:{fontSize:18,fontWeight:700,color:'#EF4444'}},eur(totalGastos))
+            )
+          ),
+          h('div',{style:{borderTop:'1px solid #334155',paddingTop:12,display:'flex',justifyContent:'space-between',alignItems:'center'}},
+            h('span',{style:{fontSize:14,fontWeight:700,color:'#94A3B8'}},'RESULTADO'),
+            h('span',{className:'mono',style:{fontSize:22,fontWeight:800,color:resultado>=0?'#10B981':'#EF4444'}},(resultado>=0?'+':'')+eur(resultado))
+          )
+        ),
+        // Resumen IVA trimestral
+        h('div',{className:'card',style:{border:'1px solid #F59E0B44',marginBottom:16}},
+          h('div',{style:{fontSize:12,fontWeight:600,color:'#64748B',marginBottom:12,letterSpacing:'.08em'}},'IVA '+MESES[mesNum-1].toUpperCase()+' '+anioNum+' (T'+trimestre+')'),
+          h('div',{style:{display:'flex',gap:8,marginBottom:12}},
+            h('div',{style:{flex:1,background:'#0F172A',borderRadius:10,padding:'10px'}},
+              h('div',{style:{fontSize:9,color:'#64748B',marginBottom:3}},'IVA REPERCUTIDO'),
+              h('div',{style:{fontSize:10,color:'#64748B',marginBottom:2}},'Cta. 477'),
+              h('div',{className:'mono',style:{fontSize:15,fontWeight:700,color:'#10B981'}},eur(ivaRepercutido))
+            ),
+            h('div',{style:{flex:1,background:'#0F172A',borderRadius:10,padding:'10px'}},
+              h('div',{style:{fontSize:9,color:'#64748B',marginBottom:3}},'IVA SOPORTADO'),
+              h('div',{style:{fontSize:10,color:'#64748B',marginBottom:2}},'Cta. 472'),
+              h('div',{className:'mono',style:{fontSize:15,fontWeight:700,color:'#EF4444'}},eur(ivaSoportado))
+            )
+          ),
+          h('div',{style:{borderTop:'1px solid #334155',paddingTop:10,display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
+            h('div',null,
+              h('div',{style:{fontSize:12,fontWeight:700,color:'#94A3B8'}},'A '+(ivaLiquidar>=0?'PAGAR (Cta. 475)':'DEVOLVER (Cta. 470)')),
+              h('div',{style:{fontSize:10,color:'#64748B'}},'Resultado liquidacion trimestral')
+            ),
+            h('div',{className:'mono',style:{fontSize:20,fontWeight:800,color:ivaLiquidar>=0?'#EF4444':'#10B981'}},(ivaLiquidar>=0?'+':'')+eur(ivaLiquidar))
+          ),
+          ivaRepercutido>0&&h('button',{onClick:function(){
+            // Generar asiento de liquidacion
+            var fechaLiq=new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+            var asLiq=[];
+            if(ivaLiquidar>=0){
+              // A pagar: 477 D, 472 H, 475 H
+              asLiq.push({id:gid(),fecha:fechaLiq,concepto:'Liquidacion IVA T'+trimestre+' '+anioNum+' - IVA repercutido',importe:ivaRepercutido,debe:'477',haber:'475',cat:'Liquidacion IVA',tipo:'iva_liq',origen:'manual',confirmado:false});
+              asLiq.push({id:gid(),fecha:fechaLiq,concepto:'Liquidacion IVA T'+trimestre+' '+anioNum+' - IVA soportado',importe:ivaSoportado,debe:'475',haber:'472',cat:'Liquidacion IVA',tipo:'iva_liq',origen:'manual',confirmado:false});
+            } else {
+              // A devolver: 477 D, 470 D, 472 H
+              asLiq.push({id:gid(),fecha:fechaLiq,concepto:'Liquidacion IVA T'+trimestre+' '+anioNum+' - IVA repercutido',importe:ivaRepercutido,debe:'477',haber:'472',cat:'Liquidacion IVA',tipo:'iva_liq',origen:'manual',confirmado:false});
+              asLiq.push({id:gid(),fecha:fechaLiq,concepto:'Liquidacion IVA T'+trimestre+' '+anioNum+' - Devolucion Hacienda',importe:Math.abs(ivaLiquidar),debe:'470',haber:'472',cat:'Liquidacion IVA',tipo:'iva_liq',origen:'manual',confirmado:false});
+            }
+            saveAsientos(asientos.concat(asLiq));
+            msg('Asiento de liquidacion IVA generado');
+            setVista('diario');
+          },style:{width:'100%',padding:'9px',background:'transparent',border:'1px solid #F59E0B',borderRadius:10,color:'#F59E0B',fontSize:12,fontWeight:600,cursor:'pointer'}},'Generar asiento liquidacion IVA T'+trimestre)
+        ),
+        // Desglose por cuenta
+        h('div',{style:{fontSize:11,fontWeight:600,color:'#64748B',marginBottom:8,letterSpacing:'.08em'}},'SALDO POR CUENTAS'),
+        Object.values(cuentas).sort(function(a,b){return a.cuenta.localeCompare(b.cuenta);}).map(function(c){
+          var saldo=c.debe-c.haber;
+          return h('div',{key:c.cuenta,style:{background:'#1E293B',borderRadius:10,padding:'10px 14px',marginBottom:6,border:'1px solid #334155',display:'flex',justifyContent:'space-between',alignItems:'center'}},
+            h('div',null,
+              h('div',{style:{fontSize:13,fontWeight:600,color:'#F1F5F9'}},c.cuenta+' - '+(PGC[c.cuenta]||'Cuenta')),
+              h('div',{style:{fontSize:11,color:'#64748B'}},
+                h('span',{className:'debe'},'D: '+eur(c.debe))+' / '+
+                h('span',{className:'haber'},'H: '+eur(c.haber))
+              )
+            ),
+            h('div',{className:'mono',style:{fontSize:14,fontWeight:700,color:saldo>=0?'#10B981':'#EF4444'}},(saldo>=0?'+':'')+eur(saldo))
+          );
+        })
+      ),
+
+      // IMPORTAR BANCO
+      vista==='importar'&&h('div',null,
+
+        // IMPORTAR DESDE CAJA
+        h('div',{className:'card',style:{border:'1px solid #10B98144',marginBottom:14}},
+          h('div',{style:{fontSize:13,fontWeight:600,color:'#10B981',marginBottom:8}},'IMPORTAR FACTURAS SIMPLIFICADAS (CAJA)'),
+          h('div',{style:{fontSize:12,color:'#64748B',marginBottom:12,lineHeight:1.6}},'Importa los registros confirmados del modulo de Caja como asientos contables. Cada factura genera: 570 Caja / 700 Ventas + 477 IVA repercutido.'),
+          h('button',{onClick:function(){
+            // Leer registros de Caja desde la BD
+            fetch('/api.php?key=caja').then(function(r){return r.json();}).then(function(d){
+              var registros=(d.registrosCaja||[]);
+              if(!registros.length){msg('No hay registros de Caja para importar','err');return;}
+              var nuevosAsientos=[];
+              registros.forEach(function(reg){
+                if(!reg.facturas||!reg.facturas.length) return;
+                reg.facturas.forEach(function(fac){
+                  var total=Math.abs(parseFloat(fac.importe)||0);
+                  if(!total) return;
+                  var base=Math.round(total/1.21*100)/100;
+                  var iva=Math.round((total-base)*100)/100;
+                  var fecha=fac.fecha||reg.fecha||'';
+                  // Convertir fecha si hace falta
+                  if(fecha.indexOf('T')>=0) fecha=new Date(fecha).toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+                  var concepto=('Fact.Simpl. '+(fac.numero||'')).slice(0,80);
+                  // Asiento venta: 570 D / 700 H (base)
+                  nuevosAsientos.push({id:gid(),fecha:fecha,concepto:concepto,importe:base,debe:'570',haber:'700',cat:'Ventas contado',tipo:'ingreso',origen:'caja',confirmado:false});
+                  // Asiento IVA: 570 D / 477 H
+                  nuevosAsientos.push({id:gid()+'_iva',fecha:fecha,concepto:'IVA 21% - '+concepto,importe:iva,debe:'570',haber:'477',cat:'IVA repercutido',tipo:'iva_rep',origen:'caja',confirmado:false,esIVA:true});
+                });
+              });
+              if(!nuevosAsientos.length){msg('Sin facturas para importar','err');return;}
+              // Evitar duplicados por origen caja ya existentes en el periodo
+              var existentes=asientos.filter(function(a){return a.origen==='caja';}).map(function(a){return a.concepto+a.fecha;});
+              var filtrados=nuevosAsientos.filter(function(a){return existentes.indexOf(a.concepto+a.fecha)<0;});
+              if(!filtrados.length){msg('Todas las facturas ya estan importadas','err');return;}
+              saveAsientos(asientos.concat(filtrados));
+              msg(Math.floor(filtrados.length/2)+' facturas importadas desde Caja');
+              setVista('diario');
+            }).catch(function(){msg('Error al leer datos de Caja','err');});
+          },style:{width:'100%',padding:'12px',background:'#0F172A',border:'2px solid #10B981',borderRadius:12,color:'#10B981',fontSize:13,fontWeight:600,cursor:'pointer'}},'Importar facturas de Caja')
+        ),
+
+        // IMPORTAR EXTRACTO BBVA
+        h('div',{className:'card'},
+          h('div',{style:{fontSize:13,fontWeight:600,color:'#94A3B8',marginBottom:8}},'IMPORTAR EXTRACTO BBVA'),
+          h('div',{style:{fontSize:12,color:'#64748B',marginBottom:4,lineHeight:1.6}},'Sube el CSV o PDF del extracto BBVA. Se clasifican automaticamente segun el Plan General Contable.'),
+          h('div',{style:{fontSize:11,color:'#F59E0B',marginBottom:12}},'Nota: los ingresos en efectivo (00009) se contabilizan como 572 Banco / 570 Caja, ya que la venta ya viene de las facturas de Caja.'),
+          h('input',{type:'file',accept:'text/csv,.csv',id:'csv-cont',style:{display:'none'},onChange:function(e){if(e.target.files[0])procesarCSV(e.target.files[0]);e.target.value='';}}),
+          h('input',{type:'file',accept:'application/pdf',id:'pdf-cont',style:{display:'none'},onChange:function(e){if(e.target.files[0])procesarPDF(e.target.files[0]);e.target.value='';}}),
+          h('button',{onClick:function(){document.getElementById('csv-cont').click();},disabled:loading,className:'btnP',style:{marginBottom:10,background:loading?'#334155':'linear-gradient(135deg,#10B981,#059669)'}},loading?'Procesando...':'Subir CSV del banco (recomendado)'),
+          h('button',{onClick:function(){document.getElementById('pdf-cont').click();},disabled:loading,style:{width:'100%',padding:'12px',background:'#0F172A',border:'2px dashed #334155',borderRadius:12,color:'#64748B',fontSize:13,fontWeight:600,cursor:loading?'not-allowed':'pointer'}},loading?'Procesando...':'Subir PDF del banco')
+        ),
+        h('div',{className:'card'},
+          h('div',{style:{fontSize:12,fontWeight:600,color:'#94A3B8',marginBottom:8}},'CLASIFICACION AUTOMATICA'),
+          h('div',{style:{fontSize:11,color:'#64748B',lineHeight:1.7}},
+            [
+              {cod:'00009',desc:'Ingreso efectivo -> 572 Banco / 570 Caja (traspaso, venta ya en Caja)'},
+              {cod:'00007',desc:'Transferencia recibida -> 572 Banco / 430 Clientes'},
+              {cod:'00379',desc:'Amortizacion prestamo -> 521 Deuda / 572 Banco'},
+              {cod:'00326',desc:'Impuestos -> 631 Tributos / 572 Banco'},
+              {cod:'00321',desc:'Seguridad Social -> 642 SS / 572 Banco'},
+              {cod:'00734',desc:'Alquiler -> 621 Arrendamiento / 572 Banco'},
+              {cod:'00925',desc:'Telecomunicaciones -> 629 Servicios / 572 Banco'},
+              {cod:'00129',desc:'Electricidad -> 628 Suministros / 572 Banco'},
+              {cod:'00469',desc:'Seguros -> 625 Seguros / 572 Banco'},
+              {cod:'00120',desc:'Tarjeta -> 629 Otros / 572 Banco'},
+            ].map(function(r,i){return h('div',{key:i,style:{marginBottom:4}},r.cod+' '+r.desc);})
+          )
+        ),
+        asientos.length>0&&h('button',{onClick:function(){if(confirm('Eliminar todos los asientos del periodo?')){saveAsientos(asientos.filter(function(a){var p=a.fecha.split('/');return !(parseInt(p[1])===mesNum&&parseInt(p[2])===anioNum);}));msg('Asientos del periodo eliminados');}},style:{width:'100%',padding:'11px',background:'transparent',border:'1px solid #EF4444',borderRadius:12,color:'#EF4444',fontSize:13,fontWeight:600,cursor:'pointer'}},'Borrar asientos de este periodo')
+      ),
+
+      // GASTO MANUAL
+      vista==='gastos'&&h('div',null,
+        h('div',{className:'card'},
+          h('div',{style:{fontSize:13,fontWeight:600,color:'#94A3B8',marginBottom:12}},'NUEVO ASIENTO MANUAL'),
+          h('div',{className:'fld'},h('span',{className:'lbl'},'FECHA'),h('input',{type:'date',value:gastoForm.fecha,onChange:function(e){var v=e.target.value;setGastoForm(function(f){return Object.assign({},f,{fecha:v});});},className:'inp'})),
+          h('div',{className:'fld'},h('span',{className:'lbl'},'CONCEPTO'),h('input',{value:gastoForm.concepto,onChange:function(e){var v=e.target.value;setGastoForm(function(f){return Object.assign({},f,{concepto:v});});},placeholder:'Descripcion del gasto o ingreso',className:'inp'})),
+          h('div',{className:'fld'},h('span',{className:'lbl'},'IMPORTE (EUR)'),h('input',{type:'number',step:'0.01',value:gastoForm.importe,onChange:function(e){var v=e.target.value;setGastoForm(function(f){return Object.assign({},f,{importe:v});});},placeholder:'0.00',className:'inp'})),
+          h('div',{className:'fld'},
+            h('span',{className:'lbl'},'CATEGORIA'),
+            h('select',{value:gastoForm.cat,onChange:function(e){
+              var v=e.target.value;
+              var cats={
+                'Gasto manual':{debe:'629',haber:'572'},
+                'Compra proveedor':{debe:'600',haber:'572'},
+                'Combustible':{debe:'629',haber:'572'},
+                'Nominas':{debe:'640',haber:'572'},
+                'Seguridad Social':{debe:'642',haber:'572'},
+                'Alquiler':{debe:'621',haber:'572'},
+                'Suministros':{debe:'628',haber:'572'},
+                'Seguros':{debe:'625',haber:'572'},
+                'Servicios profesionales':{debe:'623',haber:'572'},
+                'Publicidad':{debe:'627',haber:'572'},
+                'Reparaciones':{debe:'622',haber:'572'},
+                'Impuestos':{debe:'631',haber:'572'},
+                'Ingreso efectivo':{debe:'570',haber:'700'},
+                'Prestacion servicios':{debe:'572',haber:'705'},
+                'Otro ingreso':{debe:'572',haber:'700'},
+              };
+              var cuentas=cats[v]||{debe:'629',haber:'572'};
+              setGastoForm(function(f){return Object.assign({},f,{cat:v,debe:cuentas.debe,haber:cuentas.haber});});
+            },className:'inp'},
+              ['Gasto manual','Compra proveedor','Combustible','Nominas','Seguridad Social','Alquiler','Suministros','Seguros','Servicios profesionales','Publicidad','Reparaciones','Impuestos','Ingreso efectivo','Prestacion servicios','Otro ingreso'].map(function(c){return h('option',{key:c,value:c},c);})
+            )
+          ),
+          h('div',{style:{display:'flex',gap:8,marginBottom:14}},
+            h('div',{style:{flex:1}},
+              h('span',{className:'lbl'},'CUENTA DEBE'),
+              h('select',{value:gastoForm.debe,onChange:function(e){var v=e.target.value;setGastoForm(function(f){return Object.assign({},f,{debe:v});});},className:'inp'},
+                Object.keys(PGC).map(function(k){return h('option',{key:k,value:k},k+' ('+getSubcuenta(k)+') '+PGC[k].slice(0,15));})
+              )
+            ),
+            h('div',{style:{flex:1}},
+              h('span',{className:'lbl'},'CUENTA HABER'),
+              h('select',{value:gastoForm.haber,onChange:function(e){var v=e.target.value;setGastoForm(function(f){return Object.assign({},f,{haber:v});});},className:'inp'},
+                Object.keys(PGC).map(function(k){return h('option',{key:k,value:k},k+' ('+getSubcuenta(k)+') '+PGC[k].slice(0,15));})
+              )
+            )
+          ),
+          h('div',{style:{marginBottom:14}},
+            h('label',{style:{display:'flex',alignItems:'center',gap:10,cursor:'pointer',background:'#0F172A',borderRadius:10,padding:'10px 14px',border:'1px solid #334155'}},
+              h('input',{type:'checkbox',checked:!!gastoForm.conIVA,onChange:function(e){var v=e.target.checked;setGastoForm(function(f){return Object.assign({},f,{conIVA:v});});}},null),
+              h('div',null,
+                h('div',{style:{fontSize:13,color:'#F1F5F9',fontWeight:600}},'Lleva IVA'),
+                h('div',{style:{fontSize:11,color:'#64748B'}},'Desglosa automaticamente 472/477 al guardar')
+              )
+            )
+          ),
+          gastoForm.conIVA&&h('div',{style:{marginBottom:14}},
+            h('span',{className:'lbl'},'TIPO DE IVA'),
+            h('select',{value:gastoForm.pctIVA||21,onChange:function(e){var v=parseInt(e.target.value);setGastoForm(function(f){return Object.assign({},f,{pctIVA:v});});},className:'inp'},
+              h('option',{value:21},'21% - General'),
+              h('option',{value:10},'10% - Reducido'),
+              h('option',{value:4},'4% - Superreducido'),
+              h('option',{value:0},'0% - Exento')
+            )
+          ),
+          h('button',{className:'btnP',onClick:guardarGasto},'Guardar asiento')
+        )
+      ),
+
+      // CONFIG SUBCUENTAS
+      vista==='config'&&h('div',null,
+
+        // Ultimo numero de asiento en Contaplus
+        h('div',{className:'card',style:{border:'1px solid #F59E0B44',marginBottom:14}},
+          h('div',{style:{fontSize:13,fontWeight:600,color:'#F59E0B',marginBottom:4}},'NUMERACION CONTAPLUS'),
+          h('div',{style:{fontSize:11,color:'#64748B',marginBottom:12}},'Introduce el ultimo numero de asiento que existe en Contaplus antes de exportar. La exportacion comenzara desde el siguiente numero.'),
+          h('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+            h('span',{style:{fontSize:13,color:'#94A3B8',flexShrink:0}},'Ultimo asiento en Contaplus:'),
+            h('input',{type:'number',value:confSub._ultimoAsiento||0,onChange:function(e){
+              var v=parseInt(e.target.value)||0;
+              var nuevo=Object.assign({},confSub,{_ultimoAsiento:v});
+              saveConfSub(nuevo);
+            },style:{width:120,background:'#0F172A',border:'1px solid #F59E0B',borderRadius:8,padding:'8px 12px',color:'#E2E8F0',fontSize:14,fontFamily:'monospace',textAlign:'right'}}),
+            h('span',{style:{fontSize:13,color:'#64748B'}},'-> exportara desde el '+(((confSub._ultimoAsiento||0)+1)+'').padStart(6,'0'))
+          )
+        ),
+        h('div',{className:'card'},
+          h('div',{style:{fontSize:13,fontWeight:600,color:'#94A3B8',marginBottom:4}},'SUBCUENTAS CONTAPLUS'),
+          h('div',{style:{fontSize:11,color:'#64748B',marginBottom:12}},'Ajusta las subcuentas segun tu plan de cuentas en Contaplus Elite. Se usan al exportar xDiario.txt.'),
+          Object.keys(DEFAULT_SUBCUENTAS).map(function(k){
+            return h('div',{key:k,style:{display:'flex',gap:8,alignItems:'center',marginBottom:8}},
+              h('div',{style:{width:50,fontSize:12,color:'#94A3B8',fontWeight:600,flexShrink:0}},k),
+              h('div',{style:{flex:1,fontSize:11,color:'#475569',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},PGC[k]||''),
+              h('input',{value:confSub[k]||DEFAULT_SUBCUENTAS[k]||'',onChange:function(e){
+                var v=e.target.value;
+                var nuevo=Object.assign({},confSub);
+                nuevo[k]=v;
+                saveConfSub(nuevo);
+              },style:{width:130,background:'#0F172A',border:'1px solid #334155',borderRadius:8,padding:'6px 10px',color:'#E2E8F0',fontSize:12,fontFamily:'monospace',flexShrink:0}})
+            );
+          }),
+          h('button',{onClick:function(){saveConfSub(Object.assign({},DEFAULT_SUBCUENTAS));msg('Subcuentas restauradas por defecto');},style:{marginTop:12,width:'100%',padding:'10px',background:'transparent',border:'1px solid #475569',borderRadius:10,color:'#64748B',fontSize:12,fontWeight:600,cursor:'pointer'}},'Restaurar valores por defecto')
+        )
+      )
+    ),
+
+    // MODAL EDITAR ASIENTO
+    editAsiento&&h('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,.85)',zIndex:980,display:'flex',alignItems:'center',justifyContent:'center',padding:16}},
+      h('div',{style:{background:'#1E293B',borderRadius:20,width:'100%',maxWidth:420,maxHeight:'85dvh',display:'flex',flexDirection:'column',border:'1px solid #3B82F6'}},
+        h('div',{style:{padding:'16px 20px',borderBottom:'1px solid #334155',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}},
+          h('div',{style:{fontSize:15,fontWeight:700,color:'#F1F5F9'}},'Editar asiento'),
+          h('button',{onClick:function(){setEditAsiento(null);},style:{background:'#334155',border:'none',color:'#94A3B8',width:28,height:28,borderRadius:8,cursor:'pointer',fontSize:13}},'X')
+        ),
+        h('div',{style:{overflowY:'auto',padding:'14px 20px 20px'}},
+          h('div',{className:'fld'},h('span',{className:'lbl'},'FECHA'),h('input',{value:editAsiento.fecha,onChange:function(e){var v=e.target.value;setEditAsiento(function(f){return Object.assign({},f,{fecha:v});});},className:'inp'})),
+          h('div',{className:'fld'},h('span',{className:'lbl'},'CONCEPTO'),h('input',{value:editAsiento.concepto,onChange:function(e){var v=e.target.value;setEditAsiento(function(f){return Object.assign({},f,{concepto:v});});},className:'inp'})),
+          h('div',{className:'fld'},h('span',{className:'lbl'},'IMPORTE'),h('input',{type:'number',step:'0.01',value:editAsiento.importe,onChange:function(e){var v=e.target.value;setEditAsiento(function(f){return Object.assign({},f,{importe:v});});},className:'inp'})),
+          h('div',{className:'fld'},h('span',{className:'lbl'},'CATEGORIA'),h('input',{value:editAsiento.cat,onChange:function(e){var v=e.target.value;setEditAsiento(function(f){return Object.assign({},f,{cat:v});});},className:'inp'})),
+          h('div',{style:{display:'flex',gap:8,marginBottom:14}},
+            h('div',{style:{flex:1}},
+              h('span',{className:'lbl'},'CUENTA DEBE'),
+              h('select',{value:editAsiento.debe,onChange:function(e){var v=e.target.value;setEditAsiento(function(f){return Object.assign({},f,{debe:v});});},className:'inp'},
+                Object.keys(PGC).map(function(k){return h('option',{key:k,value:k},k+' ('+getSubcuenta(k)+') '+PGC[k].slice(0,13));})
+              )
+            ),
+            h('div',{style:{flex:1}},
+              h('span',{className:'lbl'},'CUENTA HABER'),
+              h('select',{value:editAsiento.haber,onChange:function(e){var v=e.target.value;setEditAsiento(function(f){return Object.assign({},f,{haber:v});});},className:'inp'},
+                Object.keys(PGC).map(function(k){return h('option',{key:k,value:k},k+' ('+getSubcuenta(k)+') '+PGC[k].slice(0,13));})
+              )
+            )
+          ),
+          h('div',{style:{display:'flex',gap:8,marginBottom:14}},
+            h('label',{style:{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}},
+              h('input',{type:'checkbox',checked:!!editAsiento.confirmado,onChange:function(e){var v=e.target.checked;setEditAsiento(function(f){return Object.assign({},f,{confirmado:v});});}}),
+              h('span',{style:{fontSize:13,color:'#94A3B8'}},'Marcar como confirmado')
+            )
+          ),
+          h('div',{style:{display:'flex',gap:8}},
+            h('button',{onClick:function(){
+              saveAsientos(asientos.map(function(a){return a.id===editAsiento.id?editAsiento:a;}));
+              setEditAsiento(null);msg('Asiento actualizado');
+            },className:'btnP',style:{flex:2}},'Guardar cambios'),
+            h('button',{onClick:function(){
+              if(confirm('Eliminar este asiento?')){
+                saveAsientos(asientos.filter(function(a){return a.id!==editAsiento.id;}));
+                setEditAsiento(null);msg('Asiento eliminado');
+              }
+            },style:{flex:1,background:'transparent',border:'1px solid #EF4444',borderRadius:14,color:'#EF4444',fontSize:13,fontWeight:600,cursor:'pointer',padding:'14px'}},'Borrar')
+          )
+        )
+      )
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
